@@ -18,7 +18,7 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -59,12 +59,12 @@ jobs:
           git push
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -87,8 +87,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          # tag 由本 job 在打包成功后创建并推送，Release 直接发布（非草稿）
-          tag: ${{ steps.version.outputs.tag }}
+          # tagName 由本 job 在打包成功后创建并推送，Release 直接发布（非草稿）
+          tagName: ${{ steps.version.outputs.tag }}
           releaseName: "短剧随心看 v${{ steps.version.outputs.version }}"
           releaseBody: "由 GitHub Actions 自动构建发布。安装包内嵌 updater 签名，客户端可自动更新。"
           releaseDraft: false
