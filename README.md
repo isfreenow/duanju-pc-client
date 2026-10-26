@@ -4,6 +4,20 @@
 
 > 本仓库仅包含客户端源码与本地部署说明，不涉及任何服务端实现细节。
 
+## 界面预览
+
+| 首页热榜与分类轨道 | 关键词搜索 |
+| --- | --- |
+| ![首页](assets/screenshots/home.png) | ![搜索](assets/screenshots/search.png) |
+
+| 内置播放器（横屏片源） | 播放器（竖屏片源 + 分集栏） |
+| --- | --- |
+| ![播放器](assets/screenshots/player.png) | ![竖屏播放](assets/screenshots/player-third-party.png) |
+
+| 最近观看与收藏 |
+| --- |
+| ![收藏](assets/screenshots/favorites.png) |
+
 ## 环境要求
 
 在本地运行前，请先安装以下工具：

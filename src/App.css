@@ -799,6 +799,30 @@ button {
   }
 }
 
+/* 新版本药丸：挂在右上角而非右下角，避开 toast 的落点；不自动消失，等人点。 */
+.update-pill {
+  position: fixed;
+  z-index: 61;
+  top: 52px;
+  right: 22px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: rgba(31, 35, 43, 0.94);
+  color: var(--text);
+  font-size: 13px;
+  animation: toast-in 0.16s ease-out;
+}
+
+.update-pill:hover {
+  background: var(--accent-soft);
+}
+
+.update-pill:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+}
+
 /* 详情页的收藏开关：与「播放」并排，但不抢主动作的黑底权重。 */
 .favorite-action {
   display: inline-flex;

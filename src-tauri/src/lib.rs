@@ -53,6 +53,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(app_state)
         .setup(|app| {
             // 冷启动带来的指令先存着：webview 起来后自己来取（take），取完即清。

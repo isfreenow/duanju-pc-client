@@ -26,3 +26,4 @@ dist-ssr
 # 实测样本与离线校验产物：真实加密流 + 内容密钥，绝不入库
 fixtures/
 .tmp-verify/
+.tmp-shot/

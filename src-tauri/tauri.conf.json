@@ -29,7 +29,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "msi"],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "webviewInstallMode": { "type": "offlineInstaller" }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,5 +41,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg4RjIwQ0NBMTc3NTZCOEUKUldTT2EzVVh5Z3p5aUJSeXNwOXlscUgvY25GTjlWR1RYVDd0d2pFY1FEQXVTRTVManppNHJFaUEK",
+      "endpoints": [
+        "https://github.com/isfreenow/duanju-pc-client/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

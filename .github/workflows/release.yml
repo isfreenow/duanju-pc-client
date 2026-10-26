@@ -1,35 +1,62 @@
 name: Release
 
+# push 到 main 即自动定版、打 tag、打包并发布 GitHub Release；
+# 客户端通过 updater 插件轮询 latest.json 自动收到更新。
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ""
-          # 需要 Linux / macOS 产物时解开对应注释，并在下方 artifacts 里补上对应目录
-          # - platform: ubuntu-22.04
-          #   args: "--target x86_64-unknown-linux-gnu"
-          # - platform: macos-latest
-          #   args: "--target aarch64-apple-darwin"
-          #   identifier: "macos-aarch64"
-          # - platform: macos-latest
-          #   args: "--target x86_64-apple-darwin"
-          #   identifier: "macos-x86_64"
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve next version
+        id: version
+        run: |
+          $ErrorActionPreference = "Stop"
+          git fetch --tags --quiet
+          $declared = (node -p "require('./package.json').version")
+          $tags = git tag --list "v*" | ForEach-Object { $_ -replace '^v','' } |
+            Where-Object { $_ -match '^\d+\.\d+\.\d+$' } |
+            Sort-Object { [version]$_ } -Descending
+          $highest = if ($tags) { $tags[0] } else { "0.0.0" }
+          $v = $declared
+          if ([version]$v -le [version]$highest) {
+            $p = $v.Split("."); $p[2] = [int]$p[2] + 1
+            $v = $p -join "."
+          }
+          "declared=$declared" >> $env:GITHUB_OUTPUT
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+          Write-Host "next version: v$v (declared: $declared, highest tag: v$highest)"
+
+      - name: Sync version into manifests
+        run: |
+          npm pkg set version=${{ steps.version.outputs.version }}
+          node scripts/sync-version.cjs
+          cd src-tauri; cargo update --workspace 2>$null; cd ..
+
+      - name: Commit version bump back to main
+        if: steps.version.outputs.version != steps.version.outputs.declared
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git diff --staged --quiet || git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          # 用 GITHUB_TOKEN 推回不会再次触发本 workflow（GitHub 防递归规则），安全。
+          git push
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -50,24 +77,19 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # Linux 需要额外系统依赖（Tauri 2 官方清单），Windows/macOS 不需要
-      # - name: Install Linux dependencies
-      #   if: matrix.platform == 'ubuntu-22.04'
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build and publish Tauri release
+      - name: Build and publish release
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          # workflow_dispatch 手动触发时没有 tag，用 tauri.conf.json 里的版本号建草稿 release
-          releaseName: ${{ github.ref_type == 'tag' && format('短剧随心看 {0}', github.ref_name) || '' }}
-          releaseBody: ""
-          releaseDraft: ${{ github.ref_type != 'tag' }}
+          # tag 由本 job 在打包成功后创建并推送，Release 直接发布（非草稿）
+          tag: ${{ steps.version.outputs.tag }}
+          releaseName: "短剧随心看 v${{ steps.version.outputs.version }}"
+          releaseBody: "由 GitHub Actions 自动构建发布。安装包内嵌 updater 签名，客户端可自动更新。"
+          releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}

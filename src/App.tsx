@@ -38,6 +38,7 @@ import { PlayerView } from "./views/PlayerView";
 import { RecentFavoritesView } from "./views/RecentFavoritesView";
 import { WindowControls } from "./components/WindowControls";
 import { Toaster } from "./components/Toast";
+import { UpdatePill } from "./updater";
 import { CursorFX } from "./components/CursorFX";
 import "./App.css";
 
@@ -181,6 +182,8 @@ export default function App() {
           onHome={() => openTab("home")}
           onSwitch={openEpisode}
         />
+        <Toaster />
+        <UpdatePill />
         <CursorFX />
       </>
     );
@@ -291,6 +294,7 @@ export default function App() {
       </main>
       {/* 页内提示：收藏这类即时动作的回馈，不抖弹窗。 */}
       <Toaster />
+      <UpdatePill />
       <CursorFX />
     </div>
   );
