@@ -152,17 +152,20 @@ jobs:
       - name: Publish floating-name copy
         shell: bash
         run: |
-          set -euo pipefail
-          shopt -s nullglob nomatch
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            src=(src-tauri/target/release/bundle/nsis/*-setup.exe)
-          elif [ "${{ runner.os }}" = "Linux" ]; then
-            src=(src-tauri/target/release/bundle/deb/*amd64.deb)
-          else
-            src=(src-tauri/target/release/bundle/macos/*.dmg)
-          fi
-          [ ${#src[@]} -ge 1 ] || { echo "::error::bundle 产物未找到，浮动名副本跳过"; exit 0; }
-          cp "${src[0]}" "${{ matrix.floating }}"
+          set -eu
+          # Windows runner 上 shell: bash 可能退化成 sh 执行（GITHUB_PATH 里 Git Bash 尚未生效），
+          # 所以这里只用 POSIX 写法：不用 shopt/bash 数组，glob 展开后逐个探测取第一个命中。
+          case "${{ runner.os }}" in
+            Windows) pattern='src-tauri/target/release/bundle/nsis/*-setup.exe' ;;
+            Linux)   pattern='src-tauri/target/release/bundle/deb/*amd64.deb' ;;
+            *)       pattern='src-tauri/target/release/bundle/macos/*.dmg' ;;
+          esac
+          src=""
+          for f in $pattern; do
+            if [ -e "$f" ]; then src="$f"; break; fi
+          done
+          [ -n "$src" ] || { echo "::error::bundle 产物未找到，浮动名副本跳过"; exit 0; }
+          cp "$src" "${{ matrix.floating }}"
           gh release upload "${{ needs.plan.outputs.tag }}" "${{ matrix.floating }}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
