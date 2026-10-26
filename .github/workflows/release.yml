@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          # 需要 Linux / macOS 产物时解开对应注释，并在下方 artifacts 里补上对应目录
+          # - platform: ubuntu-22.04
+          #   args: "--target x86_64-unknown-linux-gnu"
+          # - platform: macos-latest
+          #   args: "--target aarch64-apple-darwin"
+          #   identifier: "macos-aarch64"
+          # - platform: macos-latest
+          #   args: "--target x86_64-apple-darwin"
+          #   identifier: "macos-x86_64"
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Linux 需要额外系统依赖（Tauri 2 官方清单），Windows/macOS 不需要
+      # - name: Install Linux dependencies
+      #   if: matrix.platform == 'ubuntu-22.04'
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and publish Tauri release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # workflow_dispatch 手动触发时没有 tag，用 tauri.conf.json 里的版本号建草稿 release
+          releaseName: ${{ github.ref_type == 'tag' && format('短剧随心看 {0}', github.ref_name) || '' }}
+          releaseBody: ""
+          releaseDraft: ${{ github.ref_type != 'tag' }}
+          prerelease: false
+          args: ${{ matrix.args }}
