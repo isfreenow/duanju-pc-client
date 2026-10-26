@@ -1,7 +1,7 @@
 name: Release
 
-# push 到 main 即自动定版、打 tag、打包并发布 GitHub Release；
-# 客户端通过 updater 插件轮询 latest.json 自动收到更新。
+# push 到 main 即自动定版、打 tag，并在三平台并行打包发布 GitHub Release；
+# 客户端通过 updater 插件读取 latest.json 自动收到更新。
 on:
   push:
     branches: [main]
@@ -15,56 +15,97 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: windows-latest
+  # 定版与回写单独一个 job：四个平台的 runner 并行时不能都去改版本号。
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      commit: ${{ steps.commit.outputs.sha }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Resolve next version
         id: version
         run: |
-          $ErrorActionPreference = "Stop"
-          git fetch --tags --quiet
-          $declared = (node -p "require('./package.json').version")
-          $tags = git tag --list "v*" | ForEach-Object { $_ -replace '^v','' } |
-            Where-Object { $_ -match '^\d+\.\d+\.\d+$' } |
-            Sort-Object { [version]$_ } -Descending
-          $highest = if ($tags) { $tags[0] } else { "0.0.0" }
-          $v = $declared
-          if ([version]$v -le [version]$highest) {
-            $p = $v.Split("."); $p[2] = [int]$p[2] + 1
-            $v = $p -join "."
-          }
-          "declared=$declared" >> $env:GITHUB_OUTPUT
-          "version=$v" >> $env:GITHUB_OUTPUT
-          "tag=v$v" >> $env:GITHUB_OUTPUT
-          Write-Host "next version: v$v (declared: $declared, highest tag: v$highest)"
+          set -euo pipefail
+          declared=$(node -p "require('./package.json').version")
+          # 首发时仓库还没有任何 tag，grep 无匹配会让 pipefail 直接退出，所以吃掉退出码。
+          highest=$(git tag --list 'v*' | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1) || true
+          highest=${highest:-0.0.0}
+          if [ "$declared" != "$highest" ] && [ "$(printf '%s\n%s\n' "$declared" "$highest" | sort -V | tail -1)" = "$declared" ]; then
+            version="$declared"
+          else
+            # 已发布过同号（或声明值落后）：在最高 tag 上递增补丁号，而不是从过期的声明值算。
+            version=$(node -e "const [a,b,c]=process.argv[1].split('.').map(Number);console.log(\`\${a}.\${b}.\${c+1}\`)" "$highest")
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "declared: $declared · highest tag: v$highest · next: v$version"
 
       - name: Sync version into manifests
         run: |
-          npm pkg set version=${{ steps.version.outputs.version }}
+          npm pkg set version='${{ steps.version.outputs.version }}'
           node scripts/sync-version.cjs
-          cd src-tauri; cargo update --workspace 2>$null; cd ..
+          (cd src-tauri && cargo update --workspace)
 
-      - name: Commit version bump back to main
-        if: steps.version.outputs.version != steps.version.outputs.declared
+      - name: Commit and push version bump
+        id: commit
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
-          git diff --staged --quiet || git commit -m "chore: release v${{ steps.version.outputs.version }}"
-          # 用 GITHUB_TOKEN 推回不会再次触发本 workflow（GitHub 防递归规则），安全。
-          git push
+          if git diff --staged --quiet; then
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: release v${{ steps.version.outputs.version }}"
+            # GITHUB_TOKEN 推回不会再次触发本 workflow（GitHub 防递归规则）。
+            git push origin HEAD:main
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      # 各平台的 latest.json 要合并进同一份清单，并行写会互相覆盖，只能串行上传。
+      max-parallel: 1
+      matrix:
+        include:
+          # 本地 `tauri build` 靠配置的 targets: all；CI 逐个平台指定，避开 Linux 上
+          # 会连带打 rpm（runner 不一定有 rpmbuild）的意外。
+          - platform: windows-latest
+            args: "--bundles nsis,msi"
+          - platform: ubuntu-22.04
+            args: "--bundles deb,appimage"
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin --bundles app,dmg"
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin --bundles app,dmg"
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 检出定版提交，保证产物内嵌的版本号与 latest.json 声明的一致。
+          ref: ${{ needs.plan.outputs.commit }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev librsvg2-dev patchelf
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
         with:
           version: 10
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -87,9 +128,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          # tagName 由本 job 在打包成功后创建并推送，Release 直接发布（非草稿）
-          tagName: ${{ steps.version.outputs.tag }}
-          releaseName: "短剧随心看 v${{ steps.version.outputs.version }}"
-          releaseBody: "由 GitHub Actions 自动构建发布。安装包内嵌 updater 签名，客户端可自动更新。"
+          tagName: ${{ needs.plan.outputs.tag }}
+          releaseName: "短剧随心看 v${{ needs.plan.outputs.version }}"
+          releaseBody: "由 GitHub Actions 自动构建发布（Windows / Linux / macOS）。安装包带 updater 签名，已装的客户端可自动更新；macOS 产物未做开发者签名，首次打开需右键 → 打开。"
           releaseDraft: false
           prerelease: false
+          releaseCommitish: ${{ needs.plan.outputs.commit }}
+          # Windows 同时产 nsis/msi，latest.json 只有一个 windows 槽位：取 NSIS，
+          # 它的静默升级不依赖系统代码页，比 msiexec 稳。
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}

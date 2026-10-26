@@ -37,6 +37,7 @@ import { SeriesView } from "./views/SeriesView";
 import { PlayerView } from "./views/PlayerView";
 import { RecentFavoritesView } from "./views/RecentFavoritesView";
 import { WindowControls } from "./components/WindowControls";
+import { AboutDialog } from "./components/AboutDialog";
 import { Toaster } from "./components/Toast";
 import { UpdatePill } from "./updater";
 import { CursorFX } from "./components/CursorFX";
@@ -77,6 +78,8 @@ export default function App() {
   const [route, setRoute] = useState<Route>(HOME);
   const [tab, setTab] = useState("home");
   const [draft, setDraft] = useState("");
+  // 「关于」弹层：版本号与开发申明，顶栏按钮开、Esc/点遮罩关。
+  const [about, setAbout] = useState(false);
   // 窗口重新聚焦/可见时自增：数据视图把它放进取数依赖里，挂机不关窗也能换血。
   const refresh = useRefreshOnFocus();
   // 收藏快照在全应用只拉这一份，卡片据此标「★ 已收藏」；窗口回来时跟数据一起换新。
@@ -222,6 +225,9 @@ export default function App() {
           />
           <button type="submit">搜索</button>
         </form>
+        <button type="button" className="tab about-open" onClick={() => setAbout(true)}>
+          关于
+        </button>
         <WindowControls />
       </header>
 
@@ -296,6 +302,7 @@ export default function App() {
       <Toaster />
       <UpdatePill />
       <CursorFX />
+      {about && <AboutDialog onClose={() => setAbout(false)} />}
     </div>
   );
 }

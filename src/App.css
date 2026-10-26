@@ -281,7 +281,9 @@ button {
 /* 分类页顶部：面包屑 + 题材 chips 固定，不随网格滚动。 */
 .category-top {
   position: sticky;
-  top: 0;
+  /* sticky 的 top 基准是滚动容器（.main）的 padding 盒边缘：置 0 会留下 .main
+     那 12px 顶部 padding 的缝，经过的卡片从缝里露出来；用负值抵掉才贴平窗口顶。 */
+  top: -12px;
   /* 必须高于悬停卡片的 z-index:10，否则鼠标停在首排卡片上滚动时，放大封面会盖住吸顶栏。 */
   z-index: 20;
   background: var(--bg);
@@ -821,6 +823,78 @@ button {
 .update-pill:disabled {
   color: var(--muted);
   border-color: var(--line);
+}
+
+/* ── 「关于」弹层 ─────────────────────────────────────────────────────── */
+
+/* 顶栏入口复用 .tab 的悬停样式，只补一个右间距与弱化配色。 */
+.about-open {
+  color: var(--muted);
+}
+
+.about-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 5, 7, 0.66);
+  backdrop-filter: blur(4px);
+}
+
+.about-panel {
+  width: min(520px, calc(100vw - 80px));
+  padding: 26px 30px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  animation: toast-in 0.16s ease-out;
+}
+
+.about-panel h3 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.about-version {
+  margin: 6px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.about-panel p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.about-foot {
+  color: var(--muted);
+}
+
+/* 官网地址：URL 与标签底边对齐，链接本身复用全局 .link 的红字下划线。 */
+.about-site {
+  display: flex;
+  align-items: baseline;
+  color: var(--muted);
+}
+
+.about-close {
+  margin-top: 8px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #111;
+  font-weight: 600;
+}
+
+.about-close:active {
+  transform: scale(0.96);
 }
 
 /* 详情页的收藏开关：与「播放」并排，但不抢主动作的黑底权重。 */
@@ -1669,7 +1743,7 @@ body,
   left: 0;
 }
 
-/* 光标本体：四个形状共用一个锚点叠放，data-state 只放行一个。 */
+/* 光标本体：三个形状共用一个锚点叠放，data-state 只放行一个。 */
 .cursor-shape {
   position: absolute;
   top: 0;
@@ -1686,7 +1760,7 @@ body,
 }
 
 .cursor-fx[data-state="idle"] .cursor-shape-arrow,
-.cursor-fx[data-state="hot"] .cursor-shape-hand,
+.cursor-fx[data-state="hot"] .cursor-shape-arrow,
 .cursor-fx[data-state="text"] .cursor-shape-ibeam,
 .cursor-fx[data-state="grab"] .cursor-shape-grab {
   display: block;
@@ -1709,23 +1783,6 @@ body,
   fill: #fff;
   stroke: #111;
   stroke-width: 1.2;
-  stroke-linejoin: round;
-}
-
-/* 指引手：整只手用主题红，悬停可点元素时光标本体换形状而不只是套环。 */
-.cursor-shape-hand {
-  margin: -2px 0 0 7px;
-}
-
-.cursor-shape-hand svg {
-  display: block;
-  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
-}
-
-.cursor-shape-hand path {
-  fill: var(--accent);
-  stroke: #f1f1f4;
-  stroke-width: 1.1;
   stroke-linejoin: round;
 }
 
@@ -1794,7 +1851,7 @@ body,
   background: radial-gradient(circle, rgba(229, 9, 20, 0.13), transparent 65%);
 }
 
-/* 可点的在光环里浮出一层红：手形光标已经够醒目，环只负责圈住目标。 */
+/* 悬停可点元素：箭头保持不变，放大并浮红的光环就是唯一的悬停反馈。 */
 .cursor-fx[data-state="hot"] .cursor-ring {
   width: 44px;
   height: 44px;

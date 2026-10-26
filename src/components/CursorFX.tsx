@@ -170,16 +170,11 @@ export function CursorFX() {
             <span ref={glowRef} className="cursor-glow" />
             <div ref={trailRef} className="cursor-trail" />
             <span ref={ringRef} className="cursor-ring" />
-            {/* 光标本体：同一锚点上叠四个形状，data-state 切换哪个可见（见 App.css）。 */}
+            {/* 光标本体：同一锚点上叠三个形状，data-state 切换哪个可见（见 App.css）。 */}
             <span ref={dotRef} className="cursor-shape">
                 <span className="cursor-shape-arrow">
                     <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
                         <path d="M3.5 2.2v12.9l3.4-3.3 2 4.7 2.5-1.1-2-4.6h4.9z" />
-                    </svg>
-                </span>
-                <span className="cursor-shape-hand">
-                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                        <path d="M9 11.5V5.75a1.25 1.25 0 0 1 2.5 0v5.25h.75V4.25a1.25 1.25 0 0 1 2.5 0v6.75h.75V5.75a1.25 1.25 0 0 1 2.5 0v6.75h.75V7.75a1.25 1.25 0 0 1 2.5 0v7.75c0 3.2-2.3 5.5-5.6 5.5h-2.9c-2.1 0-3.4-1-4.5-2.6l-2.7-4.2a1.35 1.35 0 0 1 2.1-1.6L9 14.75z" />
                     </svg>
                 </span>
                 <span className="cursor-shape-ibeam" />
