@@ -1,0 +1,18 @@
+# Project-scoped Cargo config (does not touch the global ~/.cargo/config.toml).
+# crates.io direct access times out from this network and the local proxy at
+# 127.0.0.1:10808 is not running, so dependency resolution goes through the
+# rsproxy.cn mirror; index and crate downloads were both verified reachable.
+[source.crates-io]
+replace-with = 'rsproxy-sparse'
+
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[registries.rsproxy]
+index = "https://rsproxy.cn/crates.io-index"
+
+[net]
+git-fetch-with-cli = true

@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Dev-only harness: plays a locally recorded, still-encrypted episode through the
+  exact modules the desktop client ships (`planCencFile` → `decryptCencFile` →
+  Blob → `<video>`). It exists because the one thing a Node script cannot prove is
+  that this machine's Chromium stack decodes the result.
+
+  Inputs come from the Vite dev server's project root: /fixtures/ep01.mp4 and
+  /fixtures/ep01.mp4.key, both produced by `cargo test --test inspect_container`
+  with HG_FIXTURE set, both git-ignored.
+
+  Not referenced by index.html and not part of the Tauri bundle.
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>解密播放自检</title>
+    <style>
+      body {
+        font: 14px/1.6 system-ui, sans-serif;
+        background: #0d0f14;
+        color: #e8eaf0;
+        margin: 0;
+        padding: 20px;
+      }
+      video {
+        width: 100%;
+        max-width: 880px;
+        background: #000;
+        display: block;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #14171f;
+        padding: 12px;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>浏览器端 CENC 解密自检</h1>
+    <p id="report">准备中…</p>
+    <video id="player" controls muted playsinline></video>
+    <pre id="log"></pre>
+    <script type="module" src="/src/player/lab.ts"></script>
+  </body>
+</html>

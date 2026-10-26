@@ -1,0 +1,698 @@
+{
+  "meta": {
+    "reference": "jackotom/hongguo-drama@3.4.0 src/native/app-source.js",
+    "fixed_now_ms": 1730000000123,
+    "fixed_khronos": 1730000000,
+    "random_seed": 305419896,
+    "random_bytes_seed": 2596069104,
+    "process_nonce": "LfGw69ZqgcX03K3wszM7uUPm",
+    "process_started": 1730000000123,
+    "byte_pool": "2df1b0ebd66a81c5f4dcadf0b3333bb943e630598e1aa099cd7c34d8ac0881e6e5863db9534d10cb37423e46fd184ac77f60bbc9896968d07833fb2603221c27b32b049fa39232bcf9c923a6fe81ad73f8fc0ff7b73862de4c02fd65e84e066747169ebf2a8abdb8feac24e64dfa15ee5b23757170492772056a29e1e7e9f8f9aa3aae7d7aaebc6a3c5b35e0cf7e9def39775af3b8a9bea8f0058d73ff6e2ae3ebdf051b53afc269b4b29e788b6a8afecaf86253b4c7a86e6f0d6106822b4838ecce32cfbbe0d9f90cb29eedfdbdf916d739fbeba3a0aba3dfb0b98d28f57879d4fc30f5464a520538892d44131a2063015713faa85c7c66936b2ab548c57af18958f4f458ce32b5d063cabe655e909ecd1fe60725ce3691d07aee3040cc42165ff72d2f41c130cad94d44d8a6d3294c6f841eeabb2ca6b946e7faa0dae240ef3f9e02e1e800e8233439b9e9cc0f9ed426c7bf0cf5697cd5b737666ffc3444930c4cbbdf4fd68b78ad3985bfa7a03d682d26ec1615e6208a7b817b730268fc8c497017d43ce32704f81e626dc5e0a83ce412bdc48d59bfd2b57d6f732f9aad03f36f611fe2ae7f963f2a37e7b55d2f08baf86b241be09133713a191d4e0cfbcad58d3cce43ab7ca46f64d47cb86f69b39e3a1f62c166e22238f1e7619aa0ba7f3aaa53c446e66f4beadfaa91b1a6046cb5d04eb19e82a58e9f8afed2e33b5ee6620fcaf9f92fe8511d5a3b6ead10eef311739e2e008df1897d0f6721981ffad6678c57d7bdcd24048f62407d3cf90583a80e5fe5613f911064765cfa4dffc8d8a36bce2f9f04f6ace4f5f7dab51df6a7a494b2bdbe84a8c23229f0507f6eeae87fdd42d58c9fd6458abbab9bd83f5edf1cddd55d79e9223e03021edbb0549c5cc5f4338ac33709ccf6825d8915efab32190412e857d05198ce52d6187aee5b34db9d5fcf6e855cc014f137740c237d9291d41ddf21eac0807cc64c073cd9cf129df3a490515f43e4043ec456e7571a505358d0788ef7a65a36e366cad93f3c34172c6deba4c831ade075ee1561af76ecbdd7e132645a8e6055f8a6970d3242cbfcc63a8a3b47f886667ab2eae092bf3ccffa0d3a7c715e672ef9616d4239725e2e0d0225e5cb0e00ae8235c4fb259b7e16cb500ef123b31ffc12c9dec64c5506ca061a7fc8c2f3bd01c70e0cd8e55f10be76a0217b27f865156da9e7b4dc550f19321d659a0636ecccf81f827b8334da4109e66f4bfb7fbeb75b93da46db613c6f1a355f845f7bbd1a50adf3ab0cafe799b95786b59dbfc518abb4db623a4f1cfee340441181f83a55b984243f590cb4ffcf2d6c8955773986d7546132e04c336c770b223918788aa9473b01a1310ce8f596c881bbdbb0039d5f256eae52548f633b85ddfb3afd2f0fd0707b2d0904ca0bb8e74bc086bee62e0e181467003fff34100c7e1e1cc64842c35da031adc887f686f6fb343452e525789ccadde1311f0d7e4d844e621255bd572d371e85149619d7bbd053fb31f4d7887516066441a7f0f163fdd9838c35106a22fcb3a50168e72789a0698a909961c417ff8b4b8626aa0db6c69386fd22055c9256876bfa42d10ab20c87c14fb01fc24f32c0f4c6bd983300908f77bfb3859167a9739e390a72b19550940e9ad6e21ca8723797f0fe45ac141f0b4e710f62c25a31877c99e4d084362155a0eb0a01cfd702eef31ae0aad7fa2d2920660715d8412d02c57152f0f3ff0b15ee65d517fd8144da6d1329929383a85e6be03ddcd3d64f178d5eac9d21ea89a1a5c8879479f87a08f522f78b3fa5024f90c8e0efd7ee45b70cddd86f294a74402d0e45a6abda977eccdb1cf8a4b77c1c273dd86da087198304f6c516bb041333bb2b7306bbc878cc2e8f263c87f301641f31f6633ba62a24f327d3137024a71029e0ca0d8be9b3ea9a4eb116d43bd9b74d7b1e165edefcc92730eb39b51f459bde61af2fee958673409a92c861ae8cdd5457072639a679b3f1f0da66e96245bc235610c0e37869d56f6e2eaa880ecb2e9f30a2bd4eb3302116b5a60e411aeef8ce4c0ee7df53cb9c318feeac92d665093b131d2518bbaa5eb00dfd8a03b6fd952efacbd903d0457eb2b746c5619b3648fbf14ffc2ef44b85302b860a104216241dfffc55d1c3d2a3c1b12005508c6306edcec5f6740d13367c3a241a94ff2789da0d158d245c592ea32dd3a69c40df6b484769a0eb58101beeb9659ff4d9b6b1717475bb619b274b679e7d16656edada7a2401d7a825c1b6c6f76c982f2b490c8b92d349b2d13146999d6cfc41341330beaff5680cbcd675431cd9494418d23be4e7859f8f098bc9498c5237532c45ce777d2cdad880271e36a29a906f58a4fdb76b34abdc526ba86e41ea121907abe42fb8037cbdd13a8712905125346fb445be84d5b5c4cf9d22a0818e8500c3c3221b91c58ea82e542a60d2daf5b9a600974bef050d7c2afee1f174c958eea582303cbe0113f8d3a9237e772b4092a4c5bfc2bae7298893f525f04e0f29ba3d129f55213722b13d03685310904bb580f1df333e896373120412a662fb82c1a9aca17b36b453bc56950c8bc5654d90178fbd358a0de1ea48cec99c1c5fdd22aac46a77d853c00f11f99f88b6c9f551ac38cd37f1a01be47ae6380644f1d509a6b457c7d588efd2e31b9cd18b2b352fdb643ea7c412d61d8abf8b38a7ce8ff9cf81649031989892babff9e3fbe5f517d3e254b5c62d23c39aa35d65984e01a670fb13834b0c00d562c88e144b893a05cb128fd6460e73c279c76ee3411796184f5bdf3d309b0de4f19ad0b2c7007824efd5c5069160e92ef37f37a67865baa0ecfbc36b67c76daee7651e04259f0b1c0602d423c3d091030c044ed26f3b9b0407b2a8df2a152e33f1fb2aa40060e16a27711a577450cb13e82e8318e76d4ae0ce4065b6c7912a4482db0ac1b931d9d0f2a18c04e5223879bc577a9284f114e4b6c8fff84108cf1d25d456bad1873e353d72d0d04ef633a48564eed238d2118ab1c1a994dc06bd586da1e0595ddec41d7790242dc7fdf2990c7e1237942b081cdad82c8b8a495c500f3cc42e2cfe6a9d80c4ff717cf593a422b9f4ab48147dce2d27377892ec8d0bd1755f243a8f11638228a409611f3c7a07583ea40f7f65f8b91ae219ec1bfe7609cf96d5f4e67980d64ce80ed96dae124b6abb9a7e2008b89c11184217d90f2bf2ae4b4ccc495a222f7ae17d71998a5c48b96b4c1b2f6c91717a4740db01f8929006e6fd6feeae87db3a25589f2e60f3b7f983e8ca7e92d7e4f46f0746b1ea35c671555124aa86d8045be9fc759731ec7ffa0852f6eea4a87d89208e56a6ef4edb976363cc5c11f8d329f7e7074e1923fc41bef9902192a7b0e39e0e869fe2fe92ca0677ab07ea14772f4efd6fdb580d92249678adf946d2d47fc7a4b730271a7b6aaaa3bd78f2a49bc57a675c9404554e43f8b22b44a31a9a3bfdc83b06adf97c16b8a39c1974f0467d3ed67903238ae04c0a8ee75a41c05e314abcce90be76f137a7f2908159e03e647f0b86fd3b97d377efb45bff1c92fc63265387c44dde6633bc6203d575fa34fa813db1694574ab5ad8103c54964f2bafcb583f656f247292952d43d6017fa44b38ef71b71c6d4fa310f31005dd6cb58dc3a3ccbe069fd141cd64c5818a54b0dad31c382665d94967ef0df23e1b993fdbd5b6e9ad8c54045dd46fd2872a1400fb4df7537243b8debdda73c641c84fdd9eb7c1dbc769337a7a7aec90e7cfee658f973a3274887a62df9249d65c0b0e0b8bbd3f84e20757b1c37a45b6444bb88ed3f37cd111d7974a696bf802727c1b264438b58abc12c9a034ce778b23c9cc4539492b53eb4ca4559fc8088932656876ac38e760f0c70720d874ebecadd7ed8165398b6764e2f456415bfb98a70b06e256ad53916094dce2972b9b6e50c0531f9847a476b5fed695891bb28f7ea175b74f5ec06f08ed027d48d2bf69b101f49398cc7c24d53fc3c9f3910a03e8932a377ce1558c0363ba476d8aeade3c7d89773d7d1b8be6a36e0e89b28c93b095562ae08ca48df4d81a1cc2776658c5daf0a05ed387b26ef906c60e07d88761ff8bb0350d2fb55fc5bea7e58f7277015c9df823b07835b27bab463290109e4904f3bc1dc4b9dd7eb0aaf14e37c00a57a98faf2b22b2d185e2404206d436c8a73626e6e76d1e7a057ec30e4bd6c94a0a234fe68497ad9fdb510777098b9ff98a0733767bf05a220d810f5231bcc887ca4c622e03f5b8568093bb7817028f3077583660115422b052da222b117ed9b6aed8787301f991308ea0b9e0e33ae74024d7d4c34a7da95f19ab9c26ec5c2297d6b46dd1e742e91c038b7810b5cd776006369ebb08a0876b55c8b9f874829d1b7248029c22ecb5253648dbaa97b847576a41f48dc17f3615edb23afc242ac4373087c9843569c8c24a8414e8f2f85ec3349236c87255b12f557ed8f4bbb525d5d249ee5098093f6c3871b11f99e2ba0fb5ed4ac0f1f51765db47c352bbacf6f6f5d7a1399dd597720085f0c98cc4188661518003fc9853ab2b1ccbe5ea12737091d306a5b59837efe13bb8ffe7a69aed158489a20f4b092ec1a28f067adc7605df3b24d777e00cc416fab4534cfbea56002cffa47592339689807ffe8344470a03498132601f71e43adb96ac2e54956244160ae61a34674db6f700832fe74f86edee59cb4f06d07525d3f355b9cb012dcff31961ff09e7dace68ec52bde70e476572867a62a4d40f426a9019942149c892e9f695e349d73841708a70f3752ed726820825384fe6ce31b4ec10f428ba761bb572a81fdd0f866546fd8f9615f6f962996dc231a028954b2ec7e556d6186bcc333a025cb1bff037778475f56878d47ed70c9a1318c9437c23d1709b8f512ce95a2c5704024c6e638d3637399c90b5ad58ba511d9ae9a3cae9fe0a554f3b931cdfff1741fc2e07427acfabdf252af6e20dbbca32dc01ef9d5456d3428b64e412a075acf88abb8e796c7a96f7eeb23a7ecef15474085be8278a78beb44d2fad38da883760bbcca3d95564ede5d4d7eb3a994c99c9375c306874fb079d2a7121e362f97f4d1f8494c1510800dff253e3a6558aefbd8c6d52c253b221d9092f9f91a908de4e2e36716b074e34f448e1676c75e1a3eb5613a6ac123db12df67d5bfdc3d5f0119e0d3297b9cb1bae73c8176c2331d3f5f1707227d64e33796ff65c51ba33acbd4bef6eed2cefe0d494d88e29066ba4214c5f2e541b14ca275f22625676df0f97ff2937531cbab4dbdc8cf3fa3d12f007b733456d2cff3c13e99621e8f151468550164969ac812bd15084c75c6de6e6f2607cb6ac86f4c348780825f5b8fc95f80fb6829794c77a01a95b80152d0688b35152799daf2e97d6c29f28cab16ad71b30ee79c7abbd9b9ba15476d59715cea8c93f70a599a6bd98fb71aeae281adbbfd34bce14477da6149b320e04e6ea4eca168ba3e5fa85b005b4ef9dbd6b97445913342b8fa5509e027b26ca0e053ca33fd692ba00e2520b84af168ef937b29eb5cb77136b5281cb9f03507c57086e837f7c750187d69fa31ad191d55d6a7adc4fd5afa66a42db487d44f9f42dc7407656ec015bb4d57c2dbf93ed0c65d3a61125d63d4a10872a04b0d62ebbaccc2e91a8c697602967fb78e848eb1cfb02bbb3aa4fdcc62b232c37f5ad5f7b5e234aa0ec54d7771e0e04ba5b390b7d307ce4c21ce258cabcad0a4490f769755481f0e840f4d2f0d9573c50e5ef0d9be7",
+    "note": "byte-exact; Rust replays random_stream and byte_pool from random_bytes_cursor"
+  },
+  "sm3": [
+    {
+      "input": "",
+      "digest": "1ab21d8355cfa17f8e61194831e81a8f22bec8c728fefb747ed035eb5082aa2b"
+    },
+    {
+      "input": "YWJj",
+      "digest": "66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0"
+    },
+    {
+      "input": "aG9uZ2d1bw==",
+      "digest": "6b1b47c96869e5945b15a44e0a6f1e4d98245971f235c2d10acefac0462dd4aa"
+    },
+    {
+      "input": "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==",
+      "digest": "288337eef51eec62e7544d7270424c8dbe656254c99852870a73b2453a6a7fb1"
+    },
+    {
+      "input": "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg==",
+      "digest": "35bf03bca3dc70ed20f67cd9b55467200af3093697d7c6f5947237b46beb4779"
+    },
+    {
+      "input": "Y2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=",
+      "digest": "9f96c94f6ae99ecf77c9b0249a9fc9b468d10fdeb5ae72dbe0e29887d3e1b136"
+    },
+    {
+      "input": "YWJj",
+      "digest": "66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0",
+      "openssl_native": true
+    }
+  ],
+  "urlEncode": [
+    {
+      "values": {
+        "a": "1",
+        "b": "x y"
+      },
+      "encoded": "a=1&b=x%20y"
+    },
+    {
+      "values": {
+        "q": "it's (fine)!*",
+        "emoji": "测试",
+        "tilde": "a~b",
+        "star": "a*b",
+        "plus": "a+b"
+      },
+      "encoded": "q=it%27s%20%28fine%29%21*&emoji=%E6%B5%8B%E8%AF%95&tilde=a~b&star=a*b&plus=a%2Bb"
+    },
+    {
+      "values": {
+        "ac": "wifi",
+        "channel": "update_64",
+        "aid": "8662",
+        "app_name": "novelread",
+        "version_code": "71332",
+        "version_name": "7.1.3.32",
+        "device_platform": "android",
+        "os": "android",
+        "ssmix": "a",
+        "device_type": "25053RT47C",
+        "device_brand": "Redmi",
+        "language": "zh",
+        "os_api": "36",
+        "os_version": "16",
+        "manifest_version_code": "71332",
+        "resolution": "1280*2772",
+        "dpi": "520",
+        "update_version_code": "71332",
+        "host_abi": "arm64-v8a",
+        "dragon_device_type": "phone",
+        "pv_player": "71332",
+        "compliance_status": "0",
+        "need_personal_recommend": "1",
+        "player_so_load": "1",
+        "is_android_pad_screen": "0",
+        "ts": "1730000000",
+        "_rticket": "1730000000123"
+      },
+      "encoded": "ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=71332&version_name=7.1.3.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=71332&resolution=1280*2772&dpi=520&update_version_code=71332&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=71332&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&ts=1730000000&_rticket=1730000000123"
+    }
+  ],
+  "bits": [
+    {
+      "data": "0123456789abcdef",
+      "getIv_0x20230928": 1089524502,
+      "getIv_zero": 3277621742,
+      "sumMd5": 1191079252,
+      "reverseBits": [
+        128,
+        196,
+        162,
+        230
+      ]
+    },
+    {
+      "data": "ffffffffffffffffffffffffffffffff",
+      "getIv_0x20230928": 2331804890,
+      "getIv_zero": 3814605379,
+      "sumMd5": 243525414,
+      "reverseBits": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "data": "686f6e6767756f",
+      "getIv_0x20230928": 21585104,
+      "getIv_zero": 4132309120,
+      "sumMd5": 1276108350,
+      "reverseBits": [
+        22,
+        246,
+        118,
+        230
+      ]
+    }
+  ],
+  "gorgon": [
+    {
+      "name": "video-post",
+      "query": "ac=wifi&aid=8662&ts=1730000000",
+      "body": "{\"mixed_video_id_map\":{\"1004\":[\"123\"]}}",
+      "khronos": 1730000000,
+      "random": 0,
+      "x_gorgon": "84040000400161ad43a8142f2e3bdeec244161d94d0bba379b24"
+    },
+    {
+      "name": "video-post",
+      "query": "ac=wifi&aid=8662&ts=1730000000",
+      "body": "{\"mixed_video_id_map\":{\"1004\":[\"123\"]}}",
+      "khronos": 1730000000,
+      "random": 258,
+      "x_gorgon": "840402014001c54b3a867ecc563acedc1565ce4dae391b158306"
+    },
+    {
+      "name": "video-post",
+      "query": "ac=wifi&aid=8662&ts=1730000000",
+      "body": "{\"mixed_video_id_map\":{\"1004\":[\"123\"]}}",
+      "khronos": 1730000000,
+      "random": 16385,
+      "x_gorgon": "8404014040013539e75916dea2dd8c2d7586b177050cf971cd15"
+    },
+    {
+      "name": "video-post",
+      "query": "ac=wifi&aid=8662&ts=1730000000",
+      "body": "{\"mixed_video_id_map\":{\"1004\":[\"123\"]}}",
+      "khronos": 1730000000,
+      "random": 43981,
+      "x_gorgon": "8404cdab400160c72ad9d8c60f6964089c4ad1b6eb2502f6cb05"
+    },
+    {
+      "name": "video-post",
+      "query": "ac=wifi&aid=8662&ts=1730000000",
+      "body": "{\"mixed_video_id_map\":{\"1004\":[\"123\"]}}",
+      "khronos": 1730000000,
+      "random": 65535,
+      "x_gorgon": "8404ffff4001d656142277e850685e23b16f83ef498491b29fa1"
+    },
+    {
+      "name": "search-get",
+      "query": "ac=wifi&aid=8662&query=%E6%B5%8B%E8%AF%95&ts=1730000000",
+      "body": null,
+      "khronos": 1730000000,
+      "random": 0,
+      "x_gorgon": "840400004001daa088955f71ffb8deec244161d94d0bba379bf9"
+    },
+    {
+      "name": "search-get",
+      "query": "ac=wifi&aid=8662&query=%E6%B5%8B%E8%AF%95&ts=1730000000",
+      "body": null,
+      "khronos": 1730000000,
+      "random": 258,
+      "x_gorgon": "8404020140017e46f1bb359287b9cedc1565ce4dae391b1583db"
+    },
+    {
+      "name": "search-get",
+      "query": "ac=wifi&aid=8662&query=%E6%B5%8B%E8%AF%95&ts=1730000000",
+      "body": null,
+      "khronos": 1730000000,
+      "random": 16385,
+      "x_gorgon": "8404014040018e342c645d80735e8c2d7586b177050cf971cdc8"
+    },
+    {
+      "name": "search-get",
+      "query": "ac=wifi&aid=8662&query=%E6%B5%8B%E8%AF%95&ts=1730000000",
+      "body": null,
+      "khronos": 1730000000,
+      "random": 43981,
+      "x_gorgon": "8404cdab4001dbcae1e49398deea64089c4ad1b6eb2502f6cbd8"
+    },
+    {
+      "name": "search-get",
+      "query": "ac=wifi&aid=8662&query=%E6%B5%8B%E8%AF%95&ts=1730000000",
+      "body": null,
+      "khronos": 1730000000,
+      "random": 65535,
+      "x_gorgon": "8404ffff40016d5bdf1f3cb681eb5e23b16f83ef498491b29f7c"
+    },
+    {
+      "name": "empty-body",
+      "query": "a=1",
+      "body": "",
+      "khronos": 1730000000,
+      "random": 0,
+      "x_gorgon": "84040000400173512c835f71ffb8deec244161d94d0bba379b6c"
+    },
+    {
+      "name": "empty-body",
+      "query": "a=1",
+      "body": "",
+      "khronos": 1730000000,
+      "random": 258,
+      "x_gorgon": "840402014001d7b755ad359287b9cedc1565ce4dae391b15834e"
+    },
+    {
+      "name": "empty-body",
+      "query": "a=1",
+      "body": "",
+      "khronos": 1730000000,
+      "random": 16385,
+      "x_gorgon": "84040140400127c588725d80735e8c2d7586b177050cf971cd5d"
+    },
+    {
+      "name": "empty-body",
+      "query": "a=1",
+      "body": "",
+      "khronos": 1730000000,
+      "random": 43981,
+      "x_gorgon": "8404cdab4001723b45f29398deea64089c4ad1b6eb2502f6cb4d"
+    },
+    {
+      "name": "empty-body",
+      "query": "a=1",
+      "body": "",
+      "khronos": 1730000000,
+      "random": 65535,
+      "x_gorgon": "8404ffff4001c4aa7b093cb681eb5e23b16f83ef498491b29fe9"
+    }
+  ],
+  "branchOf": [
+    {
+      "label": "md5-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800000",
+      "branch": 2,
+      "khronos": 1729800000
+    },
+    {
+      "label": "md5-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800002",
+      "branch": 2,
+      "khronos": 1729800002
+    },
+    {
+      "label": "md5-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800004",
+      "branch": 0,
+      "khronos": 1729800004
+    },
+    {
+      "label": "md5-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800005",
+      "branch": 2,
+      "khronos": 1729800005
+    },
+    {
+      "label": "no-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800000",
+      "branch": 0,
+      "khronos": 1729800000
+    },
+    {
+      "label": "no-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800001",
+      "branch": 0,
+      "khronos": 1729800001
+    },
+    {
+      "label": "no-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800002",
+      "branch": 0,
+      "khronos": 1729800002
+    },
+    {
+      "label": "no-body",
+      "url": "https://example.com/api/?ac=wifi&aid=8662&ts=1729800003",
+      "branch": 0,
+      "khronos": 1729800003
+    }
+  ],
+  "hashF13": [
+    {
+      "label": "md5-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "bb6cb5c68df4652941caf652a366f2d8",
+      "khronos": 1729800000,
+      "tsBytes": "40a71a67",
+      "branch": 2,
+      "hash": "656bbf523a511617aa0c4234531a23cfbb6cb5c68df4652941caf652a366f2d88f0f7fca"
+    },
+    {
+      "label": "md5-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "bb6cb5c68df4652941caf652a366f2d8",
+      "khronos": 1729800002,
+      "tsBytes": "42a71a67",
+      "branch": 2,
+      "hash": "daf5470f0229c65416fe96c6f681e6295e482565"
+    },
+    {
+      "label": "md5-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "bb6cb5c68df4652941caf652a366f2d8",
+      "khronos": 1729800004,
+      "tsBytes": "44a71a67",
+      "branch": 0,
+      "hash": "37a19fcc2d9eec746886b2c60ee81474966dc3e8"
+    },
+    {
+      "label": "md5-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "bb6cb5c68df4652941caf652a366f2d8",
+      "khronos": 1729800005,
+      "tsBytes": "45a71a67",
+      "branch": 2,
+      "hash": "ee8b53ebe9edd0169c52a4d196a0a8e63ccf82e0"
+    },
+    {
+      "label": "no-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "00000000000000000000000000000000",
+      "khronos": 1729800000,
+      "tsBytes": "40a71a67",
+      "branch": 0,
+      "hash": "10ce8b1cf42e642f7926aac3fd6811c224ed6fa7"
+    },
+    {
+      "label": "no-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "00000000000000000000000000000000",
+      "khronos": 1729800001,
+      "tsBytes": "41a71a67",
+      "branch": 0,
+      "hash": "8e888fbb99937ab05765ad1650c1c99635368eac"
+    },
+    {
+      "label": "no-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "00000000000000000000000000000000",
+      "khronos": 1729800002,
+      "tsBytes": "42a71a67",
+      "branch": 0,
+      "hash": "656bbf523a511617aa0c4234531a23cf000000000000000000000000000000008f0f7fca"
+    },
+    {
+      "label": "no-body",
+      "querySm3": "656bbf523a511617aa0c4234531a23cf66db4171a531fa0a3f04bfca62f66de1",
+      "bodyMd5": "00000000000000000000000000000000",
+      "khronos": 1729800003,
+      "tsBytes": "43a71a67",
+      "branch": 0,
+      "hash": "86824d30183b094a4314c75a333792c74d87e3b3"
+    }
+  ],
+  "aesV3": [
+    {
+      "khronos": 1000,
+      "wordSize": 0,
+      "key": "0000000000000000",
+      "iv": "1fe109a4125283f418de9e051a969e12",
+      "data": "f1593376766ea98d34f31b057a9d5be4010101010101010101010101010101010101010101010101",
+      "sbox_slice": "fa7d086b9c59b34b045f39d0384a91990067a6209ff54d827326eedf18668333800319fbd9feaeaaa9b052c60bf379254e78b436ac5d1a279e88dbbd3c63ec4915c1301fdcb856d46ccdca0943c835a3ef1ef496d2fc0e727b9484d1ea455a62023fd31281342bdd7ee628f2a54613013b21f66137292a0ded8cafbf9d5cbb24760f75e45389e1988db19a65704f544c58ab6e6f8b23c407110cbacfa0a48ed8053d14b2da74c3d7e7bed67fde48163e8590a155b7774222c986502e17f964312c9bf16d1c4468e3e9a89397cb3257ebe5716aadc0ccc7c5fd601da22d47a7e251695e7ace0a41b6958ff7b987e03a06108ab5f85bd5f0bc92ff7c2fc2e81b40",
+      "block": "baadd7272b3e10f0dd15ad7ee625317c",
+      "encrypt": "5bd15933767e6ea90d14f31f057a9d5be4210105110901008121410511090100812141051101030081"
+    },
+    {
+      "khronos": 1001,
+      "wordSize": 1,
+      "key": "1111111111111111",
+      "iv": "1fe109a4125283f418de9e051a969e12",
+      "data": "f1593376766ea98d34f31b057a9d5be4020202020202020202020202020202020202020202020202",
+      "sbox_slice": "ec1bdabdba98910cb22b83413467fb0ad876b546055961237590872ae350154cacb179ebaee595470468f0863d518b0fca8ee4b94ef21282bc0ed5f7ef2825cf5b5de96a5502e133be93e7f5ad9d3e3924a8e2fa1757d07a0d0830d6b8a38dfd079ac41e6e226497d21db0bf45663f6cdddb2780a711dca6c552f8c0b6c85c0073607ba01913aac935484bd3a4cd9f99f3104440547e29f4061fa2aba12f3cf6af856236217f5edf201ab3b4e6ff72848f6526945a77ea4378c74acc2c146bc6e87453fcd41cce317003188c96383289f13a5fd7f9a969b7633758c23bc371cb9e92018a0b4d889bbb4f6d6fe0fea549de561609ed9cc12dee817dd97cd12e42",
+      "block": "f7668ede4be61a835ed27d3be6e7d896",
+      "encrypt": "88f11937667e6ea88d14b31f15729d5a64224206020a000302024202020a0003820202060202000202"
+    },
+    {
+      "khronos": 1002,
+      "wordSize": 2,
+      "key": "2222222222222222",
+      "iv": "1fe109a4125283f418de9e051a969e12",
+      "data": "f1593376766ea98d34f31b057a9d5be4030303030303030303030303030303030303030303030303",
+      "sbox_slice": "5b4dc1a65dea44fd454e1ba13fd189e17d2faadbabad59cbb1ce9a28c9e0f670394ad7ff30f5ddbc573b118db2ee00b6e61a5a7cf9dec4cd2e80bbb94ca59f8408c66f426cf027e78b3a9c51fb6721754131a7ca20432ab7bfd97af2b5f88c2c23834f8f60a004133714e301c563665c7481df58bd68903dd2b334f419933229d649ae0d4bd8079eac1e2d0b40b872ba761071a8e4561d48fee5c24791da87269d1f886bc098be25099733a385165e7fdc6e54e9f7a9c8e8c377d0822bec02628a920e3eb00f05f3f19678388636183c24cf0ab453cc6165a4c794d5157e6def792235126a8e5206557b46645095e20cedd31703a29b99eb1cfcafd47369fa5f",
+      "block": "75980868fe72da361828dba939c3043f",
+      "encrypt": "d1f1593366766ca98d34b31f157a9f5a64230303130b01020323030713030303830343030303030203"
+    },
+    {
+      "khronos": 1003,
+      "wordSize": 3,
+      "key": "3333333333333333",
+      "iv": "1fe109a4125283f418de9e051a969e12",
+      "data": "f1593376766ea98d34f31b057a9d5be4040404040404040404040404040404040404040404040404",
+      "sbox_slice": "f72c1ebfc8e1f39f76807148aa94ad64fb89c660c332b34dd2e044dd5fa8b1c7682334c96d127fb7eb15bea9d17893a00c92a4d747e38ac270ab26419a79a7d814858fc06f56d08c11b92e3ce29dcf0ede035d463ecd38430f335ad91a656c223bfc30a688ea37a2b48d8e519cd640eef9f884f4ae97e9ca0a456757042f835cd5c5c482b6a391981f4aac96816ecb1b0908af1895497d54edfa16313adab866f5a5f1fe10010674cc63df7c2825f6ceb24f8be5bc8769bb8621070036e70b50599b1ce862581961f2bd275eba1de699423d0d2ab5dc5b29f02d4c537b6a734e3f75ff4ba1351755723920d3b0fdef02ec777ee42bdb90c1059e7ad4526b2413",
+      "block": "83588f1528a14d1af2a1a14d51f67906",
+      "encrypt": "38f15937667e6ca90d14b31b157a9d5b64244404140c060584240404040c040504244400040c040584"
+    }
+  ],
+  "xmxor": [
+    {
+      "key": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "data": "2df1b0ebd66a81c5",
+      "out": "521de3de90f37af9"
+    },
+    {
+      "key": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "data": "2df1b0ebd66a81c5f4dcadf0b3333bb9",
+      "out": "8608691d524fe75f55021dfebb24ef6c"
+    },
+    {
+      "key": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "data": "2df1b0ebd66a81c5f4dcadf0b3333bb943e630598e1aa099cd7c34d8ac0881e6e5",
+      "out": "6cfd490ab779f25c3b783cafb7cbab7f55b0358e08fce0292551496ca965b6b437"
+    },
+    {
+      "key": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "data": "2df1b0ebd66a81c5f4dcadf0b3333bb943e630598e1aa099cd7c34d8ac0881e6e5863db9534d10cb37423e46fd184ac77f60bbc9896968d07833fb2603221c27",
+      "out": "2f9572c0d40d28dd2a8d9d1861b261f589b72097ecaccba2a39f5a57be521662b228ed70e112ee11b6a1b0f5b72d2852eac3d2f77ea808f7dbeed67c98cdbb38"
+    },
+    {
+      "key": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "data": "2df1b0ebd66a81c5f4dcadf0b3333bb943e630598e1aa099cd7c34d8ac0881e6e5863db9534d10cb37423e46fd184ac77f60bbc9896968d07833fb2603221c27b32b049fa39232bcf9c923a6fe81ad73f8fc0ff7b73862de4c02fd65e84e066747169ebf2a8abdb8feac24e64dfa15ee5b23757170492772056a29e1e7e9f8f9aa3aae7d7aaebc6a3c5b35e0cf7e9def39775af3b8a9bea8f0058d73ff6e2ae3ebdf051b53afc269b4b29e788b6a8afecaf86253b4c7a86e6f0d6106822b4838ecce32cfbbe0d9f9",
+      "out": "6fdb9c1d3f8abf728b3b3475c13de7965bd57753ec129de811862d8dbedcdc11a8a69394b6c1f611076f1c9709976e21a5f8f9d6daea0593ba09b2bcb4c912a4256ccea111ed2ee6032359a5863b4de08e2cdc62fba57a78fad61e27a95d20e8edd2636873ab2802c7ef50ac8bd44819f314f06f5cd249f917784f42e3f47549370263bb4df0b2d49bc6e9c3c9701e19b2f55acefa440df0559c1b5d079915d9ee36a22d4b3f34262a203d7229d6147a8d873e3f77614ef1fb6056f48abc44b54180e573e7c91497"
+    },
+    {
+      "key": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "data": "2df1b0ebd66a81c5f4dcadf0b3333bb943e630598e1aa099cd7c34d8ac0881e6e5863db9534d10cb37423e46fd184ac77f60bbc9896968d07833fb2603221c27b32b049fa39232bcf9c923a6fe81ad73f8fc0ff7b73862de4c02fd65e84e066747169ebf2a8abdb8feac24e64dfa15ee5b23757170492772056a29e1e7e9f8f9aa3aae7d7aaebc6a3c5b35e0cf7e9def39775af3b8a9bea8f0058d73ff6e2ae3ebdf051b53afc269b4b29e788b6a8afecaf86253b4c7a86e6f0d6106822b4838ecce32cfbbe0d9f90cb29eedfdbdf916d739fbeba3a0aba3dfb0b98d28f57879d4fc30f5464a520538892d44131a2063015713faa85c7c66936b2ab548c57af18958f4f458ce32b5d063cabe655e909ecd1fe60725ce3691d07aee3040cc42165ff72d2f41c130cad94d44d8a6d3294c6f841eeabb2ca6b946e7faa0dae240ef3f9e02e1e800e8233439b9e9cc0f9ed426c7bf0cf5697cd5b737666ffc3444930c4cbbdf4fd68b78ad3985bfa7a03d682d26ec1615e6208a7b817b730268fc8c497017d43ce32704f81e626dc5e0a83ce412bdc48d59bfd2b57d6f732f9aad03f36f611fe2ae7f963f2a37e7b55d2f08baf86b241be09133713a191d4e0cfbcad58d3cce43ab7ca46f64d47cb86f69b39e3a1f62c166e22238f1e7619aa0ba7f3aaa53c446e66f4beadfaa91b1a6046cb5d04eb19e82a58e9f8afed2e33b5ee6",
+      "out": "0f134af3559667128f4d113eca042fd508372be15611cc81517b9ea466325582b201357f14846d4069a960e51bf2c4407f08e5c6329b810359282a6323497692476e46059e4be48195225f36bb12a2814953261f1994932cd8e23d657de0b8dc8fef7274e0a422750479fc8f21e6fa90a336cd4d0de310d47f9bd7bbaf4bb89fc5a867364307ceb3b1b7a8472e3e27fa372639ebc535ed76c9de4154284879569a41e1cfa4e6ab2c0093b38b0e7c6507f5eca29ae0a77c8365c171c1fba0f4d3b1bfa2809d4737d62beb51af421145afc182618d529a9db8694c8cb3f2205336408649f46d80b702c9d45dd3a5ebe050f40024b6d34a633648e65d28f553c617ead6fdfda6cae81c9a57fd1fd180f5d4da5b2f9c6e1f4f96e7b3bceb5d761505f77f85b7749e7d0a78cfa16cb394ae8a78e2fa36213774cf22c32798d048806ff4d914cc1e3a844a002f2b93eaaa167c2ea30bd98a698bd4a76bac58970ceb562459e62ea22b6cbd13e913c0dcd4acaad23b0123b32202c5483aefbc2289567d179688f603ac7e26e151b8dcc41600004b01631bf573451dbf3fa07100553c64583d0fcc17a0d7592e8a41248fd5761fd7a09dbc384cc38497f24e1a65b8e0b6a2e5c19d5beef83a17c70646ba72748d9fbf96641368e4ef263e923c0b5831517cabfb3d35fb397ee2aec4a1c5306ee9a3f2d2c6c7ccbe08642c6d23193c7dfe"
+    }
+  ],
+  "keyHash": [
+    {
+      "random": 1,
+      "hash": "9ec3ea534629da4f42fe29167a6c7749d98d348ec0a5dc8ac4ebd05e8105594b",
+      "seed": "ffffffff"
+    },
+    {
+      "random": 305419896,
+      "hash": "489143ef7f0135c393ebcef82f8e631276f292343e2bc4603e9d62b236414918",
+      "seed": "d85ffeff"
+    },
+    {
+      "random": 2147483647,
+      "hash": "b95e91aea47db098abb52820ce1ec947b8129ea91d94c1bebfd801dd94e5cfc4",
+      "seed": "7807f8ff"
+    },
+    {
+      "random": 4294967295,
+      "hash": "353645c4e8ef225a786f7a275d9b7dd4ed48817b2ab2fa775cfed73648f881e9",
+      "seed": "f807f8ff"
+    }
+  ],
+  "deviceProto": [
+    {
+      "deviceId": "1000000000000001",
+      "proto": "CAIQBBoEODY2MiIQMTAwMDAwMDAwMDAwMDAwMSoYTGZHdzY5WnFnY1gwM0szd3N6TTd1VVBtMgghbm9wZXJtITjvwGxA78BsSAZQ78BsWgghbm90c2V0IWIPQXNpYS9TaGFuZ2hhaSw4agV6aF9DTnAIhQEAAAAAjQEAAAAAlQEAAAAAnQEAAAAApQEAAAAArQEAAAAAsgECMTa4AVLAAUjIAfbRyMDZZNAB9tHIwNlk2AH20cjA2WTgAfbRyMDZZOgBAfIBCjI1MDUzUlQ0N0P6AQVSZWRtaYICCjI1MDUzUlQ0N0OKAgoyNTA1M1JUNDdDkgIGWGlhb21pmgIFUmVkbWmiAgVSZWRtabACPg==",
+      "random_stream": [],
+      "random_bytes_cursor": 0
+    },
+    {
+      "deviceId": "1000000000009999",
+      "proto": "CAIQBBoEODY2MiIQMTAwMDAwMDAwMDAwOTk5OSoYTGZHdzY5WnFnY1gwM0szd3N6TTd1VVBtMgghbm9wZXJtITjvwGxA78BsSAZQ78BsWgghbm90c2V0IWIPQXNpYS9TaGFuZ2hhaSw4agV6aF9DTnAIhQEAAAAAjQEAAAAAlQEAAAAAnQEAAAAApQEAAAAArQEAAAAAsgECMTa4AVLAAUjIAfbRyMDZZNAB9tHIwNlk2AH20cjA2WTgAfbRyMDZZOgBAfIBCjI1MDUzUlQ0N0P6AQVSZWRtaYICCjI1MDUzUlQ0N0OKAgoyNTA1M1JUNDdDkgIGWGlhb21pmgIFUmVkbWmiAgVSZWRtabACPg==",
+      "random_stream": [],
+      "random_bytes_cursor": 0
+    }
+  ],
+  "medusa": [
+    {
+      "label": "video",
+      "url": "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/?ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=71332&version_name=7.1.3.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=71332&resolution=1280*2772&dpi=520&update_version_code=71332&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=71332&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&iid=1050516078614122&device_id=1142687216643568&ts=1730000000&_rticket=1730000000123",
+      "body": "eyJiaXpfcGFyYW0iOnsiZGV2aWNlX2xldmVsIjozfSwibWl4ZWRfdmlkZW9faWRfbWFwIjp7IjEwMDQiOlsiNzMwMDAwMDAwMDAwMDAwMDAwMSJdfX0=",
+      "khronos": 1730000000,
+      "device_iid": "1050516078614122",
+      "device_device_id": "1142687216643568",
+      "x_medusa": "g7QdZ3dcQp1XY8FcVp7VF9d7fH/l0gABHBVd0S7+AbmCOC57ZqiaGqXbQZ52Q20EU2Or2VQrDM3sZqlNwYuF+CS7/Q6PAjlp+K5It3mPNzjNabe0DjSL79LztEvJpon5jdVHFotpBFsfFeIqibTw15QwxYihxdIBDjgZfGJV9L9HoMolyCvwLGdqiAMHA6jnZUsmI7/NbFauqujw6ibrZz5bvkXwp/NQF6g0Z2PLKebUKr9Trxl4+3RrJg+xS4PZz4iKiH4Z+GJz1nZwwQ03FI6u4NiBEkA+x7WyJJ/f7Qib+jD8kUtTinyM+PSafcAHMt9aPso7yB4UeCM4/dYvNBYa6yJzaBbavyrbTLBfwqBGscMvA6WbHTuEf2+NZ9TbdRj98CcfLIWSxuG/gm7sLobDiZ0sFpajmlZbtEo9A1RDn0ZJDjmL1ML33/Fr1kPku0GVRUbNnCcb8en+Qr8YiHzN9lYTiNnXqSTs2fWyHcdh0DLoQQglKZ00Fo+jxX5aY3scdckuqJYmDoD52GfI7LAkWO3W+LDXRfdg0YvPwTEl07rGj068TiylBML9nPjao+S1dp7QoqCFVw9MRKawB+oTTpJpQvvEK1AdmGDjdnEjyXEROKCMDG4S8k5LYSR0NSvIKTeQn917HdizLia/xI8tVdd2kHocsHS2l52XfTPujzOaYmXprZLiYVw6sPODifKvsdnFpCfg22xM8ylwAnlt12NnfLLW3cPpYwTgU/yrAq/32k4HWby0Ukgk9a/EpPaPuPj8p4UTAOPRF5Cf2PnAO3LqUmAKNgrtqSa+ztdeflayzLQT3lC45E7QtXUEoVFisD14CqpkF0FCreJUszjGOHl1bWpCkyDZ4Vgc5tihDj4MwWO+1mpriYNA4z7NJpkxZottXFcczslBJHfToGrTDQpKVdDsKPMsTAkQpRxuaCZiMC71zYHO/L9U5cwX3FeYJ7xRHC1IH0O0fA0lqGf+jtx1waNU6RMe/J/6//yf+79sag==",
+      "random_stream": [
+        0.5296608593780547,
+        0.8932473817840219,
+        0.481672850670293,
+        0.41572301951237023,
+        0.961896262364462
+      ],
+      "random_bytes_cursor": 12
+    },
+    {
+      "label": "search",
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v?ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=71332&version_name=7.1.3.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=71332&resolution=1280*2772&dpi=520&update_version_code=71332&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=71332&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&iid=1050516078614122&device_id=1142687216643568&query=%E6%B5%8B%E8%AF%95&ts=1730000000&_rticket=1730000000123",
+      "body": null,
+      "khronos": 1730000000,
+      "device_iid": "1050516078614122",
+      "device_device_id": "1142687216643568",
+      "x_medusa": "g7QdZ3dcQp1XY8FcVp7VF9d7fH/l0gABFTVd0T72AScEGLfmrRdswacZlfihq5UzvBXwPbaI94qptlEc00aXNLoWihoMugspIC18k2SHcAqXaeDus49puAArnMTtAopcq6gPq44iKR9kslsegYhZtzYkyoYeKpC7kSmXX/XCm0Z76Y1Chv6MmW6WJzhvP/HhbAntOeT1MEX68ZFABRIx6anDXNCDqGZynTiuPee5PIR/Ww+YQoMDVgxrf+WtBYemPjH2wCAva/XQWSdxyMpCb8ACO9gkP5acIDVuIDv2QoSivxO6zOdTLtnZtxsSbGSoeN7s6q7sDp5Rvt3ULX6Pow91kuDifuW9PCrbTLBXwqFGscMvA6WbHTuEf2+NZ9TbdRj98CcfLIWSxuG/gm7sLobDiZ0sFpajmlZbtEo9A1RDn0ZJDjmL1ML33/Fr1kPku0GVRUbNnCcb8en+Qr8YiHzN9lYTiNnXqSTs2fWyHcdh0DLoQQglKZ00Fo+jxX5aY3scdckuqJYmDoD52GfI7LAkWO3W+LDXRfdg0YvPwTEl07rGj068TiylBML9nPjao+S1dp7QoqCFVw9MRKawB+oTTpJpQvvEK1AdmGDjdnEjyXEROKCMDG4S8k5LYSR0NSvIKTeQn917HdizLia/xI8tVdd2kHocsHS2l52XfTPujzOaYmXprZLiYVw6sPODifKvsdnFpCfg22xM8ylwAnlt12NnfLLW3cPpYwTgU/yrAq/32k4HWby0Ukgk9a/EpPaPuPj8p4UTAOPRF5Cf2PnAO3LqUmAKNgrtqSa+ztdeflayzLQT3lC45E7QtXUEoVFisD14CqpkF0FCreJUszjGOHl1bWpCkyDZ4Vgc5tihDj4MwWO+1mpriYNA4z7NJpkxZottXFcczslBJHfToGrTDQpKVdDsKPMsTAkQpRxuaCZiMC71zYHO/L9U5cwX3FeYJ7xRHC1IH0O0fA0lqGf+jtx1waNU6RN4/J/6//yf+79sag==",
+      "random_stream": [
+        0.5296608593780547,
+        0.8932473817840219,
+        0.481672850670293,
+        0.41572301951237023,
+        0.961896262364462
+      ],
+      "random_bytes_cursor": 12
+    }
+  ],
+  "helios": [
+    {
+      "khronos": 1730000000,
+      "x_helios": "pdqXh/7VU/+pvphVHDozJxrnw14qHsARFzoHEgrpI9zM0N2O",
+      "random_stream": [
+        0.5296608593780547
+      ],
+      "random_bytes_cursor": 0
+    },
+    {
+      "khronos": 1700000000,
+      "x_helios": "pdqXhyctthfZk/3mLhRRwd/NCGsqHsARFzoHEgrpI9zM0N2O",
+      "random_stream": [
+        0.5296608593780547
+      ],
+      "random_bytes_cursor": 0
+    },
+    {
+      "khronos": 2000000001,
+      "x_helios": "pdqXh7UyxVTZbMTtgF4WqUuEUzQqHsARFzoHEgrpI9zM0N2O",
+      "random_stream": [
+        0.5296608593780547
+      ],
+      "random_bytes_cursor": 0
+    }
+  ],
+  "spadeKey": [
+    {
+      "spade_a": "oLMT9Fq9EfFfvBDsaZUS6WyVK91hly3aYpQyxUi/NMJLvgH1TLgD6A==",
+      "content_key": "0123456789abcdef0123456789abcdef"
+    },
+    {
+      "spade_a": "nLMvyFeyLs5TsinKV7Ytz1a0Efxbthf7WLUI5HKeDuNxnzvUdpk5yQ==",
+      "content_key": "deadbeefcafebabe0123456789abcdef"
+    },
+    {
+      "spade_a": "mrMpz1SzKc5XsirPVLIqzFWwKM1WsCjOV7MpzVazKcypsOP7rrbh5g==",
+      "content_key": "ffffffffffffffffffffffffffffffff"
+    },
+    {
+      "spade_a": "oLMT9VSzE/Rbshz1VLIc+lW8EvtavBL0W7MT+1qzE/pZvBP3XroR6g==",
+      "content_key": "00000000000000000000000000000000"
+    }
+  ],
+  "spadeUrl": [
+    {
+      "label": "signed-cdn",
+      "seed": "LfGw69ZqgcX03K3wszM7uQ==",
+      "ciphertext": "qBABALY7L0EKIAzY7+qrpsHlKdrgAYsJjT0P0fHLXDpZKN46sk/nHY2isFZkAh4Ebln/E7Rwlt4e5ZgOpYiOtIzN6d+wzRVX8vU1KTYrg5VtKWWL",
+      "plaintext": "https://v3-qznovelvod.com/media/abcdef.mp4?dy_q=1730000000&l=20240101",
+      "decrypted": "https://v3-qznovelvod.com/media/abcdef.mp4?dy_q=1730000000&l=20240101"
+    },
+    {
+      "label": "unicode",
+      "seed": "LfGw69ZqgcX03K3wszM7uQ==",
+      "ciphertext": "qBABAB7M/60+kVdzzYfRNnMlu6ukGA/5jrkTQ8YPUcpHzyK+iFHEiZ0tXGkgYvr5rUF1/w==",
+      "plaintext": "https://example.com/测试/第1集.mp4?a=1&b=2",
+      "decrypted": "https://example.com/测试/第1集.mp4?a=1&b=2"
+    },
+    {
+      "label": "exact-block",
+      "seed": "LfGw69ZqgcX03K3wszM7uQ==",
+      "ciphertext": "qBABAB7M/60+kVdzzYfRNnMlu6vvCPAizHW6eTlMgUShTI1TFE+oZyP78lOL/7jFzhAVpQ==",
+      "plaintext": "https://example.com/x.mp4?a=1234567890123456",
+      "decrypted": "https://example.com/x.mp4?a=1234567890123456"
+    }
+  ],
+  "signedVideoRequest": [
+    {
+      "payload": "{\"biz_param\":{\"detail_page_version\":0,\"device_level\":3,\"disable_digg_stat\":false,\"need_all_video_definition\":true,\"need_mp4_align\":false,\"use_os_player\":false,\"use_server_dns\":false,\"video_platform\":1024},\"mixed_video_id_map\":{\"1004\":[\"7300000000000000001\"]}}",
+      "url": "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/?ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=71332&version_name=7.1.3.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=71332&resolution=1280*2772&dpi=520&update_version_code=71332&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=71332&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&iid=1050516078614122&device_id=1142687216643568&ts=1730000000&_rticket=1730000000123",
+      "body": "eyJiaXpfcGFyYW0iOnsiZGV0YWlsX3BhZ2VfdmVyc2lvbiI6MCwiZGV2aWNlX2xldmVsIjozLCJkaXNhYmxlX2RpZ2dfc3RhdCI6ZmFsc2UsIm5lZWRfYWxsX3ZpZGVvX2RlZmluaXRpb24iOnRydWUsIm5lZWRfbXA0X2FsaWduIjpmYWxzZSwidXNlX29zX3BsYXllciI6ZmFsc2UsInVzZV9zZXJ2ZXJfZG5zIjpmYWxzZSwidmlkZW9fcGxhdGZvcm0iOjEwMjR9LCJtaXhlZF92aWRlb19pZF9tYXAiOnsiMTAwNCI6WyI3MzAwMDAwMDAwMDAwMDAwMDAxIl19fQ==",
+      "headers": {
+        "User-Agent": "com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)",
+        "Accept": "application/json; charset=utf-8,application/x-protobuf",
+        "Content-Type": "application/json; charset=UTF-8",
+        "x-xs-from-web": "0",
+        "x-ss-req-ticket": "1730000000123",
+        "x-tt-request-tag": "t=0;n=0",
+        "sdk-version": "2",
+        "passport-sdk-version": "50561",
+        "x-vc-bdturing-sdk-version": "3.7.2.cn",
+        "x-ss-stub": "DA8520AE9AC6C3CD963FE56505A85EFD",
+        "x-gorgon": "84049787400125b1a39d88c72732da64043e760ac6e769f30576",
+        "x-khronos": "1730000000",
+        "x-ladon": "Zx20gA==",
+        "x-argus": "gLQdZw==",
+        "x-helios": "RNyr5Cfwl/lRNP8SsznNFhmyBOaw9D15mKDBk673tvr6HUP/",
+        "x-medusa": "g7QdZ3dcQp1XY8FcVp7VF9d7fH/3AQABfxV08P1WAYkCGGIqeO0MvxxD5ip9Y8aUF/+mwHg3XrM+DVwbnhuk9iIGYepxARooTpkw5FRRg5tNylJ7Brd7THy7YVzLqZwNQhb/6WWNCv5paHJsQJgELRoZi2Bxn7QfRjJRT/pTqrHdLFqg/3QVjLqutg0uAO96GW1wm/vJ3juYVcyUfiF1mDOv/jRp7HQPPefQWDLrZXAHrw7O2U4vsqrZBSegRk5GF6JMjTjWWFzb3J4SQb1ZUkWcINc+DFLUBxaC4cqAnIjybMBWMyagxbyzjKf7IZVfYeMG3+yQ7Lt07MHdfLF0m6HcS+pplvvaruneoJvS81T3y44MLh+iLcZdMRZRFD8SXf0mto/jwoAptkpJScvMTNwp/xfnIliZGO1LmkIE/rIwgUyQsVlfUNllg35WOEW09M2n04k9nI9PWKW0LSytki7PzRYpUSEr0UEDHjsbPnl6NRxFPSZURhg605oV4T2PQxzYGYHa7KCi+8obYhEFku/OIvFXvaWnUsQf5AYlvlAq52YT5rQYFcTf46qmwAeJ6/ZQtnqnYbMtJrDFLriqt0Ds0oTem+uLammY7N9u/1j4j4DFNkCt3z4PR3PMr1RR5VaY7waG25U2EiOWe/6oAHstnbIkIA17R0+qYa2hkAALvmHQ42y8KjoFan75PtxGhR7s7Hmdz6YasB3J8SUmmI6aXv3vPjucc6pDirDJwouqQgFZGEsp61hmz32BQJv8+UcrkYheBiAy9WF9KX9W+ySaMJ3FlEH6p+nNzjD5CgkF3zq9I8xTBj1GqSerULoXYzLXc8NMvQE7iZDHN4fpHZ1+AOveDJroh1M6SIGHjx4TIsziZ/r0ueY/S+4YDH10Y35Qt21kEvii5M1GbS5MrdBVUGOBLqgAhiOXRv2dvjuzxZ0PP59nyRwoLBj2h0JB3RbQrVeOjVY/+cAzuAU9TKdChEschWwqAHPw/jd5//43eL85vg==",
+        "x-tt-dt": ""
+      },
+      "random_stream": [
+        0.5296608593780547,
+        0.8932473817840219,
+        0.481672850670293,
+        0.41572301951237023,
+        0.961896262364462,
+        0.7430573680903763,
+        0.37106230575591326
+      ],
+      "random_bytes_cursor": 12
+    }
+  ],
+  "signedSearchRequest": [
+    {
+      "keyword": "测试短剧",
+      "page": 1,
+      "cursor": null,
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v?ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=72232&version_name=7.2.2.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=72232&resolution=1280*2772&dpi=520&update_version_code=72232&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=72232&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&iid=1050516078614122&device_id=1142687216643568&query=%E6%B5%8B%E8%AF%95%E7%9F%AD%E5%89%A7&count=20&tab_type=11&bookshelf_search_plan=4&use_correct=true&user_is_login=0&offset=0&ts=1730000000&_rticket=1730000000123",
+      "headers": {
+        "User-Agent": "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)",
+        "Accept": "application/json; charset=utf-8,application/x-protobuf",
+        "x-ss-req-ticket": "1730000000123",
+        "x-tt-request-tag": "t=0;n=0",
+        "sdk-version": "2",
+        "passport-sdk-version": "50561",
+        "x-xs-from-web": "0",
+        "x-khronos": "1730000000",
+        "x-ladon": "Zx20gA==",
+        "x-argus": "gLQdZw==",
+        "x-gorgon": "84049787400157a126e79cd91265da64043e760ac6e769f30538",
+        "x-helios": "RNyr5Cfwl/lRNP8SsznNFhmyBOaw9D15mKDBk673tvr6HUP/",
+        "x-medusa": "g7QdZ3dcQp1XY8FcVp7VF9d7fH/3AQABGDV09P1WAawPOJnRRet/KoHA8RGvZmzN4zTNdtZ8xrRujtD+DVI72Sw1vw/chaVZSLg20cdyXybE1XCBJzj2soyj0NtGSE7zz0PIHYsGKXWcOUfy/3eU9MSi3FXZb+u0WDgPy4AERAOsUac09qzaO8hvzo0SaTomuotn6xHKYsiBUUIrN8lVLpR3Xi9v3wOu5hJ6kqE9oBI+omvS10JLlLE+EtQwvVEr+Z7yZLl75EMfsGCnXlJjIVwmb1P1WtU375d36bV33r6L8F0EzqdDSHk5muDBsMfkG1zFktctyGVbtmziuBV1/S/IdarXCEucNblBaHLZwOhDAnSsQQSZzchNo/LkRSjVCJYobVfw8jDcSYC+zGxyHPRYLKYZRM3X3xHnE2rMoBjHhE+HNG5r6GhAWc+FV83n9o6zNrJJ+ECV2+9nSb5dZ9ENlg6iBTgXH8PVKkxU1fvHWsRYLVPPz9P9JnLnLpGrFtJxkkZ5NIPzEtKyFxH+TRbI2SguL2pLDoq5i4eMcJ+mNGyS4AWTOjaTt0ylfvOcX2ZgR4XJtSN1dPol43YTNDfWilzAgxk0RU3MonkR4mEesdvBzZtqutBf54bDynad5Rr6MFqhnobRHmagl6e2KzBM06OaxsBz9KpQVabN5EdtUmAkRaWQBCfLGb8EEhhE2fLPib0mVvdpmn/85uIH0r35knaH+kWrxBoXuH31ZsoE9j7ceT25fZz+T4Hmf4lf9pjGI3bbqNhbBlf5NwOXQb6IPh/fxsUovQvUeI7aoTNNx7LROCA/iT1GqSerULoXYzLXc8NMvQE7iZDHN4fpHZ1+AOveDJroh1M6SIGHjx4TIsziZ/r0ueY/S+4YDH10Y35Qt21kEvii5M1GbS5MrdBVUGOBLqgAhiOXRv2dvjuzxZ0PP59nyRwoLBj2h0JB3RbQrVeOjVY/+cAzuAU9TKdChEschWwqAHN5/jd5//43eL85vg==",
+        "x-tt-dt": ""
+      },
+      "random_stream": [
+        0.5296608593780547,
+        0.8932473817840219,
+        0.481672850670293,
+        0.41572301951237023,
+        0.961896262364462,
+        0.7430573680903763,
+        0.37106230575591326
+      ],
+      "random_bytes_cursor": 12
+    },
+    {
+      "keyword": "逆袭",
+      "page": 2,
+      "cursor": {
+        "search_id": "sid-abc",
+        "passback": "pb-123",
+        "next_offset": 20
+      },
+      "url": "https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v?ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=72232&version_name=7.2.2.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=72232&resolution=1280*2772&dpi=520&update_version_code=72232&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=72232&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&iid=1050516078614122&device_id=1142687216643568&query=%E9%80%86%E8%A2%AD&count=20&tab_type=11&bookshelf_search_plan=4&use_correct=true&user_is_login=0&search_id=sid-abc&passback=pb-123&offset=20&ts=1730000000&_rticket=1730000000132",
+      "headers": {
+        "User-Agent": "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)",
+        "Accept": "application/json; charset=utf-8,application/x-protobuf",
+        "x-ss-req-ticket": "1730000000132",
+        "x-tt-request-tag": "t=0;n=0",
+        "sdk-version": "2",
+        "passport-sdk-version": "50561",
+        "x-xs-from-web": "0",
+        "x-khronos": "1730000000",
+        "x-ladon": "Zx20gA==",
+        "x-argus": "gLQdZw==",
+        "x-gorgon": "84049787400146b7126b9cd91265da64043e760ac6e769f305b0",
+        "x-helios": "RNyr5Cfwl/lRNP8SsznNFhmyBOaw9D15mKDBk673tvr6HUP/",
+        "x-medusa": "g7QdZ3dcQp1XY8FcVp7VF9d7fH/3AQABVzV08O1WAa6KGGcrYSAfcPG5y6mM5wM2wevQAxA3NPHcX6xK9O1t40lFUKYQxkvxd6m52uqq9EIG6Fs3j6NgcOYz6pqmhEiGatLh4+MPS38swujK30Z/lNDCyiFIE7vzOs1DAqJeCLfNln45V97qhcVaqvmV4fvQ8mMoe5RWCQ/m6vC5I/1edgucc19ncgq5/OOZDyQcnnSjLKg5C0vVfnIL+mJd4MydQe7Y489Dr2mHCq2X3NKZb2wWHoz6YXcPDKRJCzRZLl60jMS08AZu0nqLD6peacx/s74qm24ciqoyGp+BXamNo+Rhk6Tb3jo5aJlBbHLRwOnDAnSsQQSZzchNo/LkRSjVCJYobVfw8jDcSYC+zGxyHPRYLKYZRM3X3xHnE2rMoBjHhE+HNG5r6GhAWc+FV83n9o6zNrJJ+ECV2+9nSb5dZ9ENlg6iBTgXH8PVKkxU1fvHWsRYLVPPz9P9JnLnLpGrFtJxkkZ5NIPzEtKyFxH+TRbI2SguL2pLDoq5i4eMcJ+mNGyS4AWTOjaTt0ylfvOcX2ZgR4XJtSN1dPol43YTNDfWilzAgxk0RU3MonkR4mEesdvBzZtqutBf54bDynad5Rr6MFqhnobRHmagl6e2KzBM06OaxsBz9KpQVabN5EdtUmAkRaWQBCfLGb8EEhhE2fLPib0mVvdpmn/85uIH0r35knaH+kWrxBoXuH31ZsoE9j7ceT25fZz+T4Hmf4lf9pjGI3bbqNhbBlf5NwOXQb6IPh/fxsUovQvUeI7aoTNNx7LROCA/iT1GqSerULoXYzLXc8NMvQE7iZDHN4fpHZ1+AOveDJroh1M6SIGHjx4TIsziZ/r0ueY/S+4YDH10Y35Qt21kEvii5M1GbS5MrdBVUGOBLqgAhiOXRv2dvjuzxZ0PP59nyRwoLBj2h0JB3RbQrVeOjVY/+cAzuAU9TKdChEschWwqAHPu/jd5//43eL85vg==",
+        "x-tt-dt": ""
+      },
+      "random_stream": [
+        0.5296608593780547,
+        0.8932473817840219,
+        0.481672850670293,
+        0.41572301951237023,
+        0.961896262364462,
+        0.7430573680903763,
+        0.37106230575591326
+      ],
+      "random_bytes_cursor": 12
+    }
+  ]
+}

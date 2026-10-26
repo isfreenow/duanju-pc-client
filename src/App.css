@@ -1,0 +1,1865 @@
+/*
+ * One stylesheet, deliberately hand-rolled: a Netflix-TV-style dark shell, a
+ * poster grid that answers to the pointer, and a player surface. Nothing here is
+ * generated, so nothing here needs a build step beyond Vite's own CSS handling.
+ */
+
+:root {
+  --bg: #0b0b0d;
+  --panel: #16181d;
+  --panel-2: #1f232b;
+  --line: #2a2e37;
+  --text: #f1f1f4;
+  --muted: #9ca3af;
+  --accent: #e50914;
+  --accent-soft: rgba(229, 9, 20, 0.16);
+  --ok: #37c26e;
+  --warn: #e8a33c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * 桌面感的第一条：窗口自己不滚动。页面高度锁死在视口，滚动只发生在内容区里，
+ * 于是没有那条 Windows 经典白色滚动条——它一出现，任何东西都立刻变成「网页」。
+ */
+html,
+body {
+  height: 100%;
+  /* 两个都写：body 的值只在 html 是 visible 时才传播到视口，别赌这条规则。 */
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  /* 界面是拿来点的，不是拿来划词复制的；正文里要选字的地方另开。 */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+::selection {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 界面上真正是「文字」而不是控件的地方，允许选出来复制。 */
+.status,
+.view-sub {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.app {
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── header ─────────────────────────────────────────────────────────── */
+
+/*
+ * TV 客户端式顶栏：从页面黑色里渐变出来，不带一条硬边框——界面上分隔感越少，
+ * 越像放映机而不是网页。
+ */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 28px 12px;
+  background: linear-gradient(180deg, rgba(5, 5, 7, 0.94) 0%, rgba(11, 11, 13, 0.72) 78%, transparent 100%);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.tab:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.tab.current {
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--accent);
+  border-radius: 8px 8px 0 0;
+}
+
+.search {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.search input {
+  width: 220px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(22, 24, 29, 0.9);
+  color: var(--text);
+}
+
+.search input:focus {
+  outline: 1px solid var(--muted);
+  border-color: var(--muted);
+}
+
+.search button {
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #111;
+  font-weight: 600;
+}
+
+/* ── 无边框窗口的自绘控制按钮 ──────────────────────────────────────── */
+
+/*
+ * 去掉系统标题栏后，顶栏自己就是标题栏：按钮用 align-self:stretch 撑满整条高度，
+ * 再用负的上下/右外边距抵掉所在栏的 padding，贴到窗口右上角；左边留一点间距，
+ * 作为普通 flex 项排在搜索/分集导航后面，不会和它们抢位。
+ */
+.win-controls {
+  display: flex;
+  align-self: stretch;
+}
+
+.top .win-controls {
+  margin: -14px -28px -12px 10px;
+}
+
+.player-bar .win-controls {
+  margin: -10px -16px -10px 10px;
+}
+
+.win-btn {
+  width: 46px;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  border-radius: 0;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.win-btn:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.win-close:hover {
+  background: #e1131f;
+  color: #fff;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 12px 28px 32px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/*
+ * 内容区的滚动条：轨道透明、平时不画，鼠标进到这一列上才出现一条细的。
+ * 窗口右侧那条 17px 的经典滚动条是「网页感」最大的来源，没有之一。
+ */
+.main::-webkit-scrollbar,
+.side-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.main::-webkit-scrollbar-track,
+.side-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main::-webkit-scrollbar-thumb,
+.side-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.main:hover::-webkit-scrollbar-thumb,
+.side-list:hover::-webkit-scrollbar-thumb {
+  background: rgba(232, 234, 240, 0.22);
+  background-clip: content-box;
+}
+
+.main::-webkit-scrollbar-thumb:hover,
+.side-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 234, 240, 0.38);
+  background-clip: content-box;
+}
+
+/* 横向那条「继续观看」轨道不配滚动条，滚轮和拖动就够。 */
+.recent-row {
+  scrollbar-width: none;
+}
+
+.recent-row::-webkit-scrollbar {
+  display: none;
+}
+
+
+/* ── views ──────────────────────────────────────────────────────────── */
+
+.view-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.view-head h2,
+.series-text h2 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: 0.2px;
+}
+
+.recent-head h3,
+.episode-section h3,
+.related h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.view-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 分类页顶部：面包屑 + 题材 chips 固定，不随网格滚动。 */
+.category-top {
+  position: sticky;
+  top: 0;
+  /* 必须高于悬停卡片的 z-index:10，否则鼠标停在首排卡片上滚动时，放大封面会盖住吸顶栏。 */
+  z-index: 20;
+  background: var(--bg);
+  /* 上内边距补足 .main 的顶部 padding，滚动时从下方经过的卡片不会从缝隙里露出；
+     负上外边距把静止态下两份 padding 的叠加吃掉，页面顶部不留双份空白。 */
+  padding: 12px 0 10px;
+  margin: -12px 0 4px;
+  box-shadow: 0 8px 12px -10px rgba(0, 0, 0, 0.7);
+}
+
+.category-top .view-head {
+  margin-bottom: 12px;
+}
+
+/* 详情页复用同一套吸顶面包屑，但没有 chips 行，别再垫那 12px。 */
+.category-top .view-head:only-child {
+  margin-bottom: 0;
+}
+
+.category-top .chips {
+  margin-bottom: 0;
+}
+
+/* 「查看全部」页顶部面包屑：首页 › 标题 与标题同一行（.view-head 本就是 flex 基线行）。 */
+.crumbs {
+  gap: 10px;
+}
+
+.crumb-home {
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.crumb-home:hover {
+  color: var(--text);
+}
+
+.crumb-sep {
+  color: var(--muted);
+  opacity: 0.55;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.chip {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.chip.current {
+  background: var(--text);
+  border-color: var(--text);
+  color: #111;
+  font-weight: 600;
+}
+
+.status {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.status-warn {
+  border-color: rgba(232, 163, 60, 0.5);
+  color: var(--warn);
+}
+
+.status-error {
+  border-color: rgba(255, 90, 95, 0.5);
+  color: var(--accent);
+}
+
+/* ── grid ───────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 18px 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  text-align: left;
+  border-radius: 8px;
+  /* 悬停放大时不能被卡片自己的边界裁掉。 */
+  overflow: visible;
+  /* 给放大后的卡片一个可以拔高的堆叠基准，否则会被后面绘制的邻居盖住。 */
+  position: relative;
+  z-index: 0;
+}
+
+.cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-2);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+/*
+ * 指针碰到哪张，哪张就微微向前站——放大、提亮、加一层重影。放大会溢出到
+ * 邻居身上，而网格/轨道里后绘制的卡片天然盖住先绘制的，所以悬停那张靠 z-index 拔高。
+ */
+.card:hover,
+.card:focus-visible {
+  z-index: 10;
+}
+
+.card:hover .cover {
+  transform: scale(1.045);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  outline: 2px solid rgba(241, 241, 244, 0.9);
+  outline-offset: -2px;
+}
+
+.card:active .cover {
+  transform: scale(1.01);
+}
+
+.cover img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.cover img.loaded {
+  opacity: 1;
+}
+
+/* 未加载封面的模糊遮罩占位：毛玻璃渐变 + 高斯模糊的剧名首字 + 斜向扫光。 */
+.cover-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, #2b303a 0%, #1f232b 55%, #171a20 100%);
+}
+
+.cover-mask-text {
+  color: #c7ccd6;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 2px;
+  filter: blur(7px);
+  opacity: 0.55;
+  transform: scale(1.15);
+}
+
+.cover-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.09) 50%, transparent 68%);
+  background-size: 220% 100%;
+  animation: cover-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes cover-shimmer {
+  0% {
+    background-position: 160% 0;
+  }
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-shimmer {
+    animation: none;
+  }
+}
+
+.cover-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: 22px;
+}
+
+.badge {
+  position: absolute;
+  z-index: 2;
+  bottom: 6px;
+  right: 6px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 11px;
+}
+
+.badge.rank {
+  left: 6px;
+  right: auto;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* 已收藏的剧在封面上角标一枚，跟详情页收藏按钮同一个红，不和集数抢位置。 */
+.badge.faved {
+  top: 6px;
+  bottom: auto;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.card:hover .title {
+  color: var(--text);
+}
+
+.title {
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.tag-warn {
+  color: var(--warn);
+  margin-left: 8px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 22px;
+}
+
+.pager button {
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pager button.current {
+  background: var(--text);
+  border-color: var(--text);
+  color: #111;
+  font-weight: 700;
+}
+
+.pager-total {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 「查看全部」页触底自动加载更多：sentinel 留一行高度供 IntersectionObserver 命中；取完就是「没有更多了」。 */
+.load-more {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 24px;
+  margin-top: 22px;
+}
+
+.load-more-sentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.load-more-end {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── 首页（Netflix 式横向行）──────────────────────────────────────── */
+
+/*
+ * 一行的海报轨道：右侧溢出横向滚动，不画滚动条（和「继续观看」行同一套手感）。
+ * 卡片宽度固定 168px，与网格里的卡一致，行与行之间好对齐。
+ */
+.rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 168px;
+  gap: 14px;
+  overflow-x: auto;
+  /* 悬浮放大的海报不能被横向滚动盒裁掉（overflow-x:auto 会连竖向一起裁）：上下留出放大幅度 + 描边的余量。 */
+  padding: 12px 0;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.rail.dragging,
+.recent-row.dragging {
+  cursor: grabbing;
+}
+
+.home-group {
+  margin-bottom: 4px;
+}
+
+.home-row {
+  margin-bottom: 26px;
+}
+
+.home-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.home-row-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.see-all {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.see-all:hover {
+  color: var(--text);
+}
+
+.rail-hint {
+  padding: 8px 0;
+}
+
+/* 「查看全部」页只显示当前页码，不给总数。 */
+.pager-page {
+  margin: 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ── series ─────────────────────────────────────────────────────────── */
+
+.back {
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.back:hover {
+  color: var(--text);
+}
+
+/*
+ * 详情页的开场：海报在左、大标题在右，动作是一颗实心红圆角按钮——和 Netflix
+ * 的详情页同一个叙事：先说「这是什么」，再给一颗最大的按钮。
+ */
+.series-hero {
+  margin-bottom: 26px;
+}
+
+.series-id {
+  display: flex;
+  gap: 26px;
+  align-items: flex-start;
+}
+
+.series-cover {
+  width: 190px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+.series-text {
+  min-width: 0;
+}
+
+.series-text h2 {
+  margin-bottom: 6px;
+}
+
+.series-social {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.series-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.primary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 26px;
+  border-radius: 6px;
+  background: var(--text);
+  color: #111;
+  font-weight: 700;
+  font-size: 15px;
+  transition: transform 0.12s ease, background 0.15s ease;
+}
+
+.primary-action:hover {
+  background: #fff;
+}
+
+.primary-action:active {
+  transform: scale(0.97);
+}
+
+/* ── 页内提示（toast）────────────────────────────────────────────────── */
+
+/* 右下角浮层：不抖弹窗、不抓焦点，只把「点了有反馈」这件事说一次就自己走。 */
+.toaster {
+  position: fixed;
+  z-index: 60;
+  right: 22px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(31, 35, 43, 0.94);
+  color: var(--text);
+  font-size: 13px;
+  animation: toast-in 0.16s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 详情页的收藏开关：与「播放」并排，但不抢主动作的黑底权重。 */
+.favorite-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: inherit;
+  font-size: 15px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.favorite-action:hover {
+  border-color: var(--accent);
+}
+
+.favorite-action:active {
+  transform: scale(0.96);
+}
+
+.favorite-action.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 星星只在被点的那一次弹一下：按钮里用 click 计数当 key 重挂这个 span，
+   于是进页面时不会自己弹一次。 */
+.favorite-action .star {
+  display: inline-block;
+  animation: star-pop 0.24s ease-out;
+}
+
+@keyframes star-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 分集格：Netflix 的季节选择器就是一堆方块号，不需要标题、不需要状态。 */
+.episodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.episode {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  padding: 6px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.episode:hover {
+  border-color: var(--text);
+  background: var(--panel-2);
+}
+
+.episode:active {
+  transform: scale(0.94);
+}
+
+.episode-no {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* ── 最新播放 / 继续播放 ──────────────────────────────────────────────── */
+
+.recent {
+  margin-bottom: 30px;
+}
+
+.recent-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.recent-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* 「继续观看」与正常剧集卡同规格：168px 宽、竖版海报，行与行才能对齐。 */
+.recent-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 168px;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 12px 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  text-align: left;
+  position: relative;
+  z-index: 0;
+}
+
+.recent-card:hover,
+.recent-card:focus-visible {
+  z-index: 10;
+}
+
+/* 「继续观看」的封面与正常卡一样是竖版海报，底部叠一条进度线。 */
+.recent-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-2);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.recent-cover img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 30%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.recent-cover img.loaded {
+  opacity: 1;
+}
+
+.recent-card:hover .recent-cover {
+  transform: scale(1.045);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  outline: 2px solid rgba(241, 241, 244, 0.9);
+  outline-offset: -2px;
+}
+
+.recent-progress {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.recent-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.recent-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 2px;
+}
+
+.recent-body .title {
+  font-size: 13px;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.resume-bar {
+  display: block;
+  height: 3px;
+  max-width: 420px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.resume-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.episode.watched {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.episode.locked,
+.episode.locked:hover {
+  border-color: var(--line);
+  background: var(--panel);
+  opacity: 0.45;
+  cursor: default;
+}
+
+.episode.locked:active {
+  transform: none;
+}
+
+.episode-pay {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.episode-mark {
+  position: absolute;
+  bottom: 3px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--accent);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 「我的」页（历史 + 收藏融合）────────────────────────────────────────────────────── */
+
+/* 收藏卡右上角的取消按钮：.card 本身就是 relative，直接钉在卡片边界上。 */
+.fav-remove {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.card:hover .fav-remove,
+.fav-remove:focus-visible {
+  opacity: 1;
+}
+
+.fav-remove:hover {
+  background: rgba(255, 90, 95, 0.9);
+}
+
+/* 按下就缩一下：✕ 的反馈不能只靠那张卡自己消失。 */
+.fav-remove:active {
+  transform: scale(0.82);
+}
+
+/* 被 ✕ 命中的卡：原地缩小淡出，比直接从网格里抽走更好接住。 */
+.card:has(> .fav-remove:active) {
+  animation: fav-card-out 0.2s ease-in forwards;
+}
+
+@keyframes fav-card-out {
+  to {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+
+/* 两段标题（最近收藏 / 最近观看）沿用 .related h3 的体量，只补段落间距。 */
+.favorite-section,
+.history-section {
+  margin-top: 6px;
+}
+
+.favorite-section h3,
+.history-section h3 {
+  font-size: 18px;
+  margin: 22px 0 12px;
+}
+
+/* 记录卡与收藏卡都共用 .grid/.card/.cover 那套，这里只剩页尾工具条的样式。
+   .history-grid 是无样式的钩子，给 e2e 区分「最近观看」那一段与其它页面的 .card。 */
+.history-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.danger {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 90, 95, 0.55);
+  color: var(--accent);
+}
+
+.danger:hover {
+  background: rgba(255, 90, 95, 0.12);
+}
+
+.link {
+  margin-left: 10px;
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+/* ── player ─────────────────────────────────────────────────────────── */
+
+/*
+ * 窗口全屏：播放器自己就是一整个视口，顶栏/页脚让位给「退出 + 上一集/下一集」。
+ * 用 fixed + 100dvh 而不是把 body 变短，是因为窗口尺寸由 Tauri 管，页面只需要
+ * 保证任何时候都刚好铺满，不留滚动条。
+ */
+.player-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: #05060a;
+}
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(5, 6, 10, 0.92);
+}
+
+.player-bar .back {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+/* 顶栏里的面包屑：与分类/详情页同词，按栏高缩字号；min-width:0 让剧名能省略号。 */
+.player-crumbs {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.player-bar .crumb-home {
+  font-size: 14px;
+}
+
+.player-bar .crumb-sep {
+  font-size: 13px;
+  flex: none;
+}
+
+/* 剧名段：字面就是标题，点它回到进来的详情页。 */
+.crumb-series {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.crumb-series:hover {
+  color: var(--accent);
+}
+
+.player-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-nav {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.player-nav button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.player-nav button:hover:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.player-nav button:not(:disabled):hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.player-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 画面 + 竖屏时的分集栏：横向排，栏不抢画面的高度。 */
+.player-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.player-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 万一尺寸算拧了，宁可留黑边也不要画到顶栏/页脚上面去。 */
+  overflow: hidden;
+  background: #000;
+}
+
+/*
+ * 画面的摆法分横竖两套，因为要保住的东西不同：
+ * 横屏——宽度就是画面要的，铺满宽度、上下留边；
+ * 竖屏——高度才是上限，所以让盒子按画面比例算出宽度（width:auto + height:100%），
+ * 控制条就贴着视频本身，而不是横跨一整屏虚化背景。
+ * 两套都带 object-fit: contain，任何情况下都不裁画面。
+ */
+.player-stage .video {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.orient-portrait .player-stage .video {
+  width: auto;
+  max-width: 100%;
+}
+
+.stage-backdrop {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  z-index: 0;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.4) saturate(1.15);
+  pointer-events: none;
+}
+
+/*
+ * 竖屏剧在 16:9 窗口里只占中间一条，两侧一定是空的——那就把右边给分集栏：
+ * 一只手能翻集，不用退出播放器回详情页再点。窗口太窄时不出现（下面那条媒体查询），
+ * 因为那时挤出来的是一列 30px 宽的按钮，不如没有。
+ */
+.player-side {
+  flex: none;
+  width: 268px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.side-head {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 8px 10px 14px;
+  display: grid;
+  /* 一格只放一个集号，窄一点才能在一屏里看见更多集；上千部的剧靠滚动而不是靠宽度。 */
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 6px;
+  align-content: start;
+}
+
+.side-row {
+  padding: 7px 2px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * 付费集（webAvailable 为 false）在分集栏上预先禁用置灰；
+ * 「正在播的这一格」也走 disabled，但保持高亮不置灰。
+ */
+.side-row:disabled {
+  cursor: default;
+}
+
+.side-row:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.side-row.locked,
+.side-row.locked:hover {
+  color: var(--muted);
+  border-color: var(--line);
+  opacity: 0.45;
+}
+
+/* 付费标签和集号上下排，侧栏格子靠网格自动撑高，不往角上压。 */
+.side-pay {
+  display: block;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.side-row.current {
+  color: #fff;
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(229, 9, 20, 0.4), rgba(229, 9, 20, 0.16));
+  cursor: default;
+}
+
+@media (max-width: 940px) {
+  .player-side {
+    display: none;
+  }
+}
+
+.player-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.player-foot .status {
+  padding: 4px 10px;
+}
+
+.screen-blank {
+  width: min(640px, 86vw);
+  padding: 24px;
+  color: var(--muted);
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.screen-blank .next {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/*
+ * 加载中的画面不是「解析片源…」一句话：背后是这张海报的虚化，中间是旋转的
+ * 圈和集名，下面才是一条很细的缓冲进度。和 Netflix 缓冲时同一个叙事。
+ */
+.stage-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.loading-backdrop {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  object-fit: cover;
+  filter: blur(34px) brightness(0.34) saturate(1.1);
+  pointer-events: none;
+}
+
+.loading-center {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(440px, 80vw);
+}
+
+.loading-title {
+  margin: 6px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+
+  .card:hover .cover,
+  .recent-card:hover .recent-cover {
+    transform: none;
+  }
+
+  .skeleton-cover,
+  .skeleton-line {
+    animation: none;
+  }
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.stage-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+/*
+ * 清晰度：Netflix 式的一个顶栏小菜单。只有一路流时连按钮都不出现，
+ * 不再在画面下面铺一排片源卡。
+ */
+.quality {
+  position: relative;
+}
+
+.quality-toggle {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.quality-toggle:hover {
+  border-color: var(--muted);
+}
+
+.quality-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 148px;
+  display: grid;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(14, 15, 18, 0.96);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.quality-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.quality-item:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.quality-item.current {
+  color: var(--text);
+  font-weight: 700;
+  background: var(--accent-soft);
+}
+
+.quality-na {
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* ── 骨架屏 ─────────────────────────────────────────────────────── */
+
+.skeleton-row {
+  margin-bottom: 26px;
+}
+
+.skeleton-cover,
+.skeleton-line {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.skeleton-cover::after,
+.skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.055) 40%, rgba(255, 255, 255, 0.11) 50%, rgba(255, 255, 255, 0.055) 60%, transparent 100%);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-cover {
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeleton-short {
+  width: 58%;
+}
+
+.skeleton-title {
+  display: block;
+  width: 180px;
+  height: 18px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+/* ── 红晕光环光标（CursorFX）────────────────────────────────────── */
+
+/*
+ * 光标定制只发生在本窗口内（DOM 覆盖层 + CSS，不碰系统光标方案）。生效范围是
+ * 整窗无例外，包括播放画面：自绘箭头的热点就在尖角像素上，拖进度条不丢精度。
+ * html 也要置 none——首帧内容还没挂上时指针已经可能在内侧，别露出一次系统箭头。
+ */
+html,
+body,
+#root,
+.app,
+.player-shell,
+.player-stage video,
+.player-stage video::-webkit-media-controls {
+  cursor: none;
+}
+
+.cursor-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 70; /* 盖过 toaster(60) 与播放器(20)，但 pointer-events 全关，不吞点击。 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.cursor-fx[data-hidden="0"] {
+  opacity: 1;
+}
+
+.cursor-ring,
+.cursor-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* 光标本体：四个形状共用一个锚点叠放，data-state 只放行一个。 */
+.cursor-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.cursor-shape span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  transform-origin: 2px 2px;
+  animation: cursor-shape-in 0.14s ease-out;
+}
+
+.cursor-fx[data-state="idle"] .cursor-shape-arrow,
+.cursor-fx[data-state="hot"] .cursor-shape-hand,
+.cursor-fx[data-state="text"] .cursor-shape-ibeam,
+.cursor-fx[data-state="grab"] .cursor-shape-grab {
+  display: block;
+}
+
+@keyframes cursor-shape-in {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+}
+
+/* 箭头：白面黑描边，热点在左上尖角；主题红只进光晕，不抢识别度。 */
+.cursor-shape-arrow svg {
+  display: block;
+  filter: drop-shadow(0 0 5px rgba(229, 9, 20, 0.5));
+}
+
+.cursor-shape-arrow path {
+  fill: #fff;
+  stroke: #111;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+/* 指引手：整只手用主题红，悬停可点元素时光标本体换形状而不只是套环。 */
+.cursor-shape-hand {
+  margin: -2px 0 0 7px;
+}
+
+.cursor-shape-hand svg {
+  display: block;
+  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
+}
+
+.cursor-shape-hand path {
+  fill: var(--accent);
+  stroke: #f1f1f4;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+/* I 形光标：光环在 text 态已收成细条，这里只补上下两道帽。 */
+.cursor-shape-ibeam {
+  width: 2px;
+  height: 20px;
+  margin: -10px 0 0 -1px;
+  background: var(--text);
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  animation:
+    cursor-shape-in 0.14s ease-out,
+    cursor-ibeam-blink 1.1s steps(1) 0.2s infinite;
+}
+
+@keyframes cursor-ibeam-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* 抓取手掌；真正拖起来（.dragging 命中 grab 态）时握紧一下。 */
+.cursor-shape-grab {
+  margin: -10px 0 0 -10px;
+}
+
+.cursor-shape-grab svg {
+  display: block;
+  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
+}
+
+.cursor-shape-grab path {
+  fill: var(--text);
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.cursor-fx[data-state="grab"][data-pressed="1"] .cursor-shape-grab svg {
+  transform: scale(0.86) rotate(-6deg);
+}
+
+.cursor-ring {
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(229, 9, 20, 0.85);
+  background: transparent;
+  transition:
+    width 0.18s ease,
+    height 0.18s ease,
+    margin 0.18s ease,
+    border-radius 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.cursor-glow {
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(229, 9, 20, 0.13), transparent 65%);
+}
+
+/* 可点的在光环里浮出一层红：手形光标已经够醒目，环只负责圈住目标。 */
+.cursor-fx[data-state="hot"] .cursor-ring {
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  background: rgba(229, 9, 20, 0.16);
+  border-color: var(--accent);
+}
+
+/* 文本域：光环直接长成一根光标的形状。 */
+.cursor-fx[data-state="text"] .cursor-ring {
+  width: 3px;
+  height: 22px;
+  margin: -11px 0 0 -1.5px;
+  border-radius: 2px;
+  border-color: var(--accent);
+  background: rgba(229, 9, 20, 0.55);
+}
+
+/* 拖动轨道中：环收紧、变白，表示「此刻攥着的是整条轨」。 */
+.cursor-fx[data-state="grab"] .cursor-ring {
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-color: rgba(241, 241, 244, 0.9);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.28);
+}
+
+.cursor-trail {
+  position: absolute;
+  inset: 0;
+}
+
+.cursor-mote {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: rgba(229, 9, 20, 0.85);
+  animation: cursor-mote-out 0.42s ease-out forwards;
+}
+
+@keyframes cursor-mote-out {
+  to {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+.cursor-ripples {
+  position: absolute;
+  inset: 0;
+}
+
+.cursor-ripple {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  border: 2px solid rgba(229, 9, 20, 0.8);
+  animation: cursor-ripple-out 0.45s ease-out forwards;
+}
+
+@keyframes cursor-ripple-out {
+  to {
+    opacity: 0;
+    transform: scale(3.4);
+  }
+}
+
+/* 按下反馈：整层 pointer-events:none，:active 轮不到覆盖物自己，由 JS 写 data-pressed。
+   收缩靠 transform，和 JS 写的位置 transform 分层（元素/容器分离）。 */
+.cursor-fx[data-pressed="1"] .cursor-ring {
+  transform: scale(0.82) !important;
+}
+
+.cursor-fx[data-pressed="1"][data-state="hot"] .cursor-ring {
+  transform: scale(0.86) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-mote,
+  .cursor-ripple {
+    display: none;
+  }
+
+  .cursor-shape span,
+  .cursor-shape-ibeam {
+    animation: none;
+  }
+}

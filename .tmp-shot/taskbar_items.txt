@@ -1,0 +1,46 @@
+﻿ControlType.Button | Start | 509,1380 56x60
+ControlType.Button | File Explorer - 4 running windows pinned | 565,1380 55x60
+ControlType.Button | WezTerm - 1 running window pinned | 620,1380 55x60
+ControlType.Button | Desktop SSH Client - 1 running window pinned | 675,1380 55x60
+ControlType.Button | 滴答清单 - 1 running window pinned | 730,1380 55x60
+ControlType.Button | Notion - 1 running window pinned | 785,1380 55x60
+ControlType.Button | 网易邮箱大师 - 1 running window pinned | 840,1380 55x60
+ControlType.Button | Discord pinned | 895,1380 55x60
+ControlType.Button | Telegram pinned | 950,1380 55x60
+ControlType.Button | 微信 - 1 running window pinned | 1005,1380 55x60
+ControlType.Button | Google Chrome - 2 running windows pinned | 1060,1380 55x60
+ControlType.Button | GodsBee (2. GodsBee) - Chrome - 1 running window pinned | 1115,1380 55x60
+ControlType.Button | Gordic (MVCheap) - Chrome - 1 running window pinned | 1170,1380 55x60
+ControlType.Button | Sarah - Chrome - 2 running windows pinned | 1225,1380 55x60
+ControlType.Button | Demo - Chrome - 1 running window pinned | 1280,1380 55x60
+ControlType.Button | Qoder CN - 1 running window pinned | 1335,1380 55x60
+ControlType.Button | Qoder - 1 running window pinned | 1390,1380 55x60
+ControlType.Button | Qoder CN IDE - 9 running windows | 1445,1380 55x60
+ControlType.Button | 闲管家-闲鱼工作台 - 2 running windows | 1500,1380 55x60
+ControlType.Button | 闲管家-闲鱼客服聊天 - 1 running window | 1555,1380 55x60
+ControlType.Button | Settings - 1 running window | 1610,1380 55x60
+ControlType.Button | Task Manager - 1 running window | 1665,1380 55x60
+ControlType.Button | Windows PowerShell - 1 running window | 1720,1380 55x60
+ControlType.Button | Terminal - 1 running window | 1775,1380 55x60
+ControlType.Button | Google Chrome - 1 running window | 1830,1380 55x60
+ControlType.Button | Google Chrome - 1 running window | 1885,1380 55x60
+ControlType.Button | v2rayN.exe - Shortcut - 1 running window | 1940,1380 55x60
+ControlType.Button | hongguo-desktop-client - 1 running window | 1995,1380 55x60
+ControlType.Button | Show Hidden Icons | 2163,1380 40x60
+ControlType.Button | Your device needs to restart to install updates. 
+Select a time to restart. | 2203,1380 40x60
+ControlType.Button | Tray Input Indicator Chinese Mode
+
+Right-click for more options | 2243,1380 40x60
+ControlType.Button | Tray Input Indicator Chinese (Simplified, Mainland China)
+Microsoft Pinyin
+
+To switch input methods, press Windows key + space. | 2283,1380 55x60
+ControlType.Button | Network 网络
+Internet access | 2343,1380 30x60
+ControlType.Button | Volume 扬声器 (Realtek High Definition Audio): 25% | 2378,1380 30x60
+ControlType.Button | Clock 3:14 AM
+‎10/‎27/‎2026 | 2418,1380 87x60
+ControlType.Button | Notifications 53 new notifications (Do not disturb on) | 2510,1380 30x60
+ControlType.Button | Show Desktop | 2545,1380 15x60
+ControlType.Pane | Running applications | 565,1380 715x60
