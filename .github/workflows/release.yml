@@ -77,14 +77,22 @@ jobs:
         include:
           # 本地 `tauri build` 靠配置的 targets: all；CI 逐个平台指定，避开 Linux 上
           # 会连带打 rpm（runner 不一定有 rpmbuild）的意外。
+          # floating 是「浮动名副本」的固定文件名，让 releases/latest/download/<名字> 永久指向最新版。
           - platform: windows-latest
             args: "--bundles nsis,msi"
+            floating: duanju-latest-windows.exe
           - platform: ubuntu-22.04
-            args: "--bundles deb,appimage"
+            args: "--bundles deb"
+            floating: duanju-latest-linux.deb
+          - platform: ubuntu-22.04
+            args: "--bundles appimage"
+            floating: duanju-latest-linux.AppImage
           - platform: macos-latest
             args: "--target aarch64-apple-darwin --bundles app,dmg"
+            floating: duanju-latest-macos-aarch64.dmg
           - platform: macos-latest
             args: "--target x86_64-apple-darwin --bundles app,dmg"
+            floating: duanju-latest-macos-x64.dmg
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -138,3 +146,23 @@ jobs:
           # 它的静默升级不依赖系统代码页，比 msiexec 稳。
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
+
+      # 把刚产出的包复制成不带版本号的固定名再传一次：带版本号的文件名没法做永久直链，
+      # 而 releases/latest/download/<固定名> 会永远指向最新版的这份副本（与 latest.json 同一机制）。
+      - name: Publish floating-name copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob nomatch
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            src=(src-tauri/target/release/bundle/nsis/*-setup.exe)
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            src=(src-tauri/target/release/bundle/deb/*amd64.deb)
+          else
+            src=(src-tauri/target/release/bundle/macos/*.dmg)
+          fi
+          [ ${#src[@]} -ge 1 ] || { echo "::error::bundle 产物未找到，浮动名副本跳过"; exit 0; }
+          cp "${src[0]}" "${{ matrix.floating }}"
+          gh release upload "${{ needs.plan.outputs.tag }}" "${{ matrix.floating }}" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
