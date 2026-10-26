@@ -11,8 +11,8 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const version = require(path.join(root, "package.json")).version;
 if (!/^\d+\.\d+\.\d+$/.test(version)) {
-  console.error(`unexpected version in package.json: ${version}`);
-  process.exit(1);
+    console.error(`unexpected version in package.json: ${version}`);
+    process.exit(1);
 }
 
 const confPath = path.join(root, "src-tauri", "tauri.conf.json");
@@ -23,12 +23,12 @@ fs.writeFileSync(confPath, JSON.stringify(conf, null, 2) + "\n");
 const cargoPath = path.join(root, "src-tauri", "Cargo.toml");
 const cargo = fs.readFileSync(cargoPath, "utf8");
 if (!cargo.includes(`version = "${version}"`)) {
-  const next = cargo.replace(/version = "[\d.]+"/, `version = "${version}"`);
-  if (next === cargo) {
-    console.error("no version field replaced in Cargo.toml");
-    process.exit(1);
-  }
-  fs.writeFileSync(cargoPath, next);
+    const next = cargo.replace(/version = "[\d.]+"/, `version = "${version}"`);
+    if (next === cargo) {
+        console.error("no version field replaced in Cargo.toml");
+        process.exit(1);
+    }
+    fs.writeFileSync(cargoPath, next);
 }
 
 console.log(`synced v${version} into tauri.conf.json and Cargo.toml`);

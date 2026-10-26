@@ -12,39 +12,39 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { toast } from "./components/Toast";
 
 export function UpdatePill() {
-  const [update, setUpdate] = useState<Update | null>(null);
-  const [busy, setBusy] = useState(false);
+    const [update, setUpdate] = useState<Update | null>(null);
+    const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    // dev 构建没有签名产物，check 会直接报错，静默跳过即可。
-    if (import.meta.env.DEV) return;
-    check()
-      .then((found) => {
-        if (alive && found) setUpdate(found);
-      })
-      .catch(() => { });
-    return () => {
-      alive = false;
+    useEffect(() => {
+        let alive = true;
+        // dev 构建没有签名产物，check 会直接报错，静默跳过即可。
+        if (import.meta.env.DEV) return;
+        check()
+            .then((found) => {
+                if (alive && found) setUpdate(found);
+            })
+            .catch(() => { });
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    if (update === null) return null;
+
+    const install = async () => {
+        setBusy(true);
+        try {
+            await update.downloadAndInstall();
+            await relaunch();
+        } catch {
+            setBusy(false);
+            toast("更新安装失败，可稍后重试");
+        }
     };
-  }, []);
 
-  if (update === null) return null;
-
-  const install = async () => {
-    setBusy(true);
-    try {
-      await update.downloadAndInstall();
-      await relaunch();
-    } catch {
-      setBusy(false);
-      toast("更新安装失败，可稍后重试");
-    }
-  };
-
-  return (
-    <button type="button" className="update-pill" onClick={install} disabled={busy}>
-      {busy ? "正在安装更新…" : `发现新版本 v${update.version}，点击更新`}
-    </button>
-  );
+    return (
+        <button type="button" className="update-pill" onClick={install} disabled={busy}>
+            {busy ? "正在安装更新…" : `发现新版本 v${update.version}，点击更新`}
+        </button>
+    );
 }
