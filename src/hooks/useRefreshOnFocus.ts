@@ -10,18 +10,18 @@
 import { useEffect, useState } from "react";
 
 export function useRefreshOnFocus(): number {
-  const [key, setKey] = useState(0);
-  useEffect(() => {
-    const bump = () => setKey((value) => value + 1);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") bump();
-    };
-    window.addEventListener("focus", bump);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", bump);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
-  return key;
+    const [key, setKey] = useState(0);
+    useEffect(() => {
+        const bump = () => setKey((value) => value + 1);
+        const onVisible = () => {
+            if (document.visibilityState === "visible") bump();
+        };
+        window.addEventListener("focus", bump);
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            window.removeEventListener("focus", bump);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, []);
+    return key;
 }
