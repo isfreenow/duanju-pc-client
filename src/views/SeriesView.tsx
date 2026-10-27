@@ -16,12 +16,18 @@
  * 点亮后「我的」页会把这部剧排在最前面。点下去有三重反馈：星星弹一下、
  * 文案当场翻面（不等落盘回来）、右下角一条自己消失的提示；失败时星星与文案回退，不假装成功。
  *
+ * 收藏旁不设开关：红果（source 为 web）的剧直接把二维码面板挂在操作行下方，
+ * 手机扫码接着看，面板里给「复制链接」和「在浏览器打开」两个按钮。
+ * 官网目前只收录红果渠道的剧，河马/西饭不显示这块面板。
+ *
  * `autoPlay` 是外部指令（`--watch` / `--series`）一路接过来的最后一棒：分集列表到手、
  * 并且历史那一发落定之后，自己点一下主按钮——看过就续播那一集那一秒，没看过就从
  * 第一集开头。两个条件缺一个都不动，免得把看到一半的剧放回开头。
  */
 
 import { useEffect, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import QRCode from "qrcode";
 import { toast } from "../components/Toast";
 import { setFavoriteId, useFavoriteIds } from "../favorites";
 import { browseList, getPublicDetails, getSeriesEpisodes, latestProgress, toggleFavorite, type Episode, type SeriesCard } from "../ipc/client";
@@ -50,10 +56,14 @@ function tagsOf(cards: SeriesCard[], seriesId: string): string[] {
 export function SeriesView({
   seriesId,
   category,
+  categoryLabel = "",
   refresh,
   autoPlay = 0,
+  onAutoPlayed,
   onPlay,
   onBack,
+  onHome,
+  onCategory,
   onPick,
 }: {
   seriesId: string;
@@ -63,8 +73,16 @@ export function SeriesView({
   refresh: number;
   /** 外部指令带进来的「替用户点一下继续播放」，带的是指令序号；0 就是没有人下过。 */
   autoPlay?: number;
+  /** 把这条指令序号回报给外层记为已消费，避免从播放器返回详情页时被重挂重新开播。 */
+  onAutoPlayed?: (seq: number) => void;
   onPlay: (episode: Episode, resumeAt?: number) => void;
   onBack: () => void;
+  /** 面包屑「首页」：真回首页，不是回 from；没给就退回 onBack。 */
+  onHome?: () => void;
+  /** 面包屑第二段的类目名，由外层翻译成中文传入；空串就只剩「首页」。 */
+  categoryLabel?: string;
+  /** 点类目名回该类的目录页；没给就不做成可点。 */
+  onCategory?: () => void;
   onPick: (card: SeriesCard) => void;
 }) {
   const list = useAsync(() => getSeriesEpisodes(seriesId), [seriesId, refresh]);
@@ -76,12 +94,44 @@ export function SeriesView({
   const favorited = favoriteIds.has(seriesId);
   // 每次点一下自增，给星星当 key：重挂才重跑动画，进页面不会自己弹。
   const [starPops, setStarPops] = useState(0);
+  // 分享面板：进详情页即按官网链接生成二维码 PNG，配复制/浏览器打开两个按钮，没有收起开关。
+  const shareUrl = `https://duanju.isfreenow.com/watch/${seriesId}`;
+  const [shareQr, setShareQr] = useState<string | null>(null);
+
+  const copyShareUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast("链接已复制 · 发给朋友或手机浏览器打开");
+    } catch {
+      toast("复制失败，可在浏览器打开后从地址栏复制");
+    }
+  };
+
+  useEffect(() => {
+    let alive = true;
+    QRCode.toDataURL(shareUrl, { width: 220, margin: 1 })
+      .then((value) => {
+        if (alive) setShareQr(value);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [shareUrl]);
+  // 从首页/分类页滚到半途点进详情时，.main 的滚动位置会带着走：进页先回到顶部。
+  // loading 进依赖：骨架屏分支提前 return 时 ref 还是空，列表到手渲染真实页面再补一次。
+  const sectionRef = useRef<HTMLElement>(null);
+  const listLoading = list.loading;
+  useEffect(() => {
+    sectionRef.current?.scrollIntoView({ block: "start", inline: "nearest" });
+  }, [seriesId, listLoading]);
 
   // 自动开播只发生一次，而且必须等列表与历史两个都落定。
   const pendingAutoPlay = useRef(autoPlay > 0);
   useEffect(() => {
     if (!pendingAutoPlay.current || list.loading || progress.loading) return;
     pendingAutoPlay.current = false;
+    onAutoPlayed?.(autoPlay);
     const seen = progress.data;
     if (seen !== null) {
       onPlay(episodeOf(seen, category), seen.finished ? 0 : seen.seconds);
@@ -89,7 +139,7 @@ export function SeriesView({
     }
     const first = list.data?.episodes[0];
     if (first !== undefined) onPlay(first, 0);
-  }, [list.data, list.loading, progress.data, progress.loading, category, onPlay]);
+  }, [autoPlay, list.data, list.loading, progress.data, progress.loading, category, onAutoPlayed, onPlay]);
 
   const switchFavorite = async () => {
     const data = list.data;
@@ -127,6 +177,8 @@ export function SeriesView({
   }
   const data = list.data;
   if (data === null) return null;
+  // 官网暂只收录红果渠道的剧（Rust 侧红果分集列表的 source 定为 "web"），河马/西饭不显示分享。
+  const canShare = data.source === "web";
 
   const meta = details.data;
   const social = meta === null ? [] : [
@@ -148,25 +200,39 @@ export function SeriesView({
   const related = scored.slice(0, RELATED_LIMIT).map((row) => row.card);
 
   return (
-    <section className="view series-view">
+    <section className="view series-view" ref={sectionRef}>
       <div className="category-top">
         <header className="view-head crumbs">
-          <button type="button" className="crumb-home" onClick={onBack}>
+          <button type="button" className="crumb-home" onClick={onHome ?? onBack}>
             首页
           </button>
-          <span className="crumb-sep" aria-hidden="true">›</span>
-          <h2>{data.seriesTitle}</h2>
+          {categoryLabel.length > 0 && (
+            <>
+              <span className="crumb-sep" aria-hidden="true">›</span>
+              {onCategory ? (
+                <button type="button" className="crumb-series" onClick={onCategory}>
+                  {categoryLabel}
+                </button>
+              ) : (
+                <span className="crumb-plain">{categoryLabel}</span>
+              )}
+            </>
+          )}
         </header>
       </div>
       <header className="series-hero">
         <div className="series-id">
           {data.cover.length > 0 && <img className="series-cover" src={data.cover} alt={data.seriesTitle} />}
           <div className="series-text">
+            <h2>{data.seriesTitle}</h2>
             <p className="view-sub">
               共 {data.total} 集
               {meta !== null && meta.episodeLabel.length > 0 && ` · ${meta.episodeLabel}`}
             </p>
             {social.length > 0 && <p className="series-social">{social.join(" · ")}</p>}
+            {meta !== null && meta.description !== undefined && meta.description.length > 0 && (
+              <p className="series-desc">{meta.description}</p>
+            )}
             <div className="series-actions">
               {seen !== null ? (
                 <button
@@ -195,6 +261,30 @@ export function SeriesView({
                 {favorited ? "已收藏" : "收藏"}
               </button>
             </div>
+            {canShare && shareQr !== null && (
+              <div className="share-panel">
+                <img className="share-qr" src={shareQr} alt="用手机扫二维码观看本剧" />
+                <div className="share-info">
+                  <p className="share-title">手机扫码接着看</p>
+                  <span className="share-link" title={shareUrl}>
+                    {shareUrl}
+                  </span>
+                  <div className="share-btns">
+                    <button type="button" className="share-copy" onClick={() => void copyShareUrl()}>
+                      复制分享链接
+                    </button>
+                    <button
+                      type="button"
+                      className="share-copy"
+                      title="用系统默认浏览器打开官网链接"
+                      onClick={() => void openUrl(shareUrl).catch(() => undefined)}
+                    >
+                      在浏览器打开
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {seen !== null && !seen.finished && seen.duration > 0 && (
               <span className="resume-bar" aria-hidden="true">
                 <span

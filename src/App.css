@@ -14,6 +14,7 @@
   --accent: #e50914;
   --accent-soft: rgba(229, 9, 20, 0.16);
   --ok: #37c26e;
+  --ok-bright: #4ade80;
   --warn: #e8a33c;
   color-scheme: dark;
 }
@@ -199,7 +200,7 @@ button {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  padding: 12px 28px 32px;
+  padding: 12px 28px 46px;
   width: 100%;
   margin: 0 auto;
 }
@@ -307,14 +308,15 @@ button {
   margin-bottom: 0;
 }
 
-/* 「查看全部」页顶部面包屑：首页 › 标题 与标题同一行（.view-head 本就是 flex 基线行）。 */
+/* 「查看全部」页顶部面包屑：首页 > 标题 与标题同一行（.view-head 本就是 flex 基线行）。 */
 .crumbs {
   gap: 10px;
 }
 
 .crumb-home {
   color: var(--muted);
-  font-size: 26px;
+  /* 按钮不继承页面字体栈，不写 font: inherit 会和旁边的 h2 标题两套字面 */
+  font: inherit;
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -326,8 +328,16 @@ button {
 .crumb-sep {
   color: var(--muted);
   opacity: 0.55;
-  font-size: 20px;
+  font-size: inherit; /* 跟随所在行的面包屑字号，分隔符不再混着小一号的 › */
   line-height: 1.1;
+}
+
+/* 面包屑里的类目名：无对应目录页时只读展示，与「首页」同词同字号。 */
+.crumb-plain {
+  color: var(--muted);
+  font: inherit;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .chips {
@@ -738,6 +748,18 @@ button {
   font-size: 12px;
 }
 
+/* 剧情简介：默认折两行截断。 */
+.series-desc {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .series-actions {
   display: flex;
   gap: 10px;
@@ -801,28 +823,285 @@ button {
   }
 }
 
-/* 新版本药丸：挂在右上角而非右下角，避开 toast 的落点；不自动消失，等人点。 */
-.update-pill {
+/* 全局底部状态栏：常驻窗口底部，显示当前版本 / 更新提示 / 下载进度。
+   普通视图靠 .main 的底部内边距、播放页靠 .player-shell 的 padding-bottom 让位，不遮挡内容与控制条。 */
+.status-bar {
   position: fixed;
-  z-index: 61;
-  top: 52px;
-  right: 22px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--accent);
-  background: rgba(31, 35, 43, 0.94);
+  z-index: 65;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: rgba(18, 20, 25, 0.96);
+  border-top: 2px solid var(--ok-bright);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 状态指示灯：默认绿、普通更新橙、强制更新红，与顶边同色。 */
+.status-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ok-bright);
+  box-shadow: 0 0 6px var(--ok-bright);
+}
+
+.status-bar.state-update {
+  border-top-color: var(--warn);
+}
+
+.status-bar.state-update .status-dot {
+  background: var(--warn);
+  box-shadow: 0 0 6px var(--warn);
+}
+
+.status-bar.state-force {
+  border-top-color: var(--accent);
+}
+
+.status-bar.state-force .status-dot {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.status-brand {
   color: var(--text);
-  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.status-ver {
+  color: var(--muted);
+}
+
+.status-spacer {
+  flex: 1;
+}
+
+.status-text {
+  color: var(--muted);
+}
+
+/* 文案随状态着色。 */
+.status-bar.state-ok .status-text {
+  color: var(--ok-bright);
+}
+
+.status-bar.state-update .status-text {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.status-bar.state-force .status-text {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-bar .update-progress {
+  flex: 0 0 140px;
+  min-width: 0;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.status-bar .update-progress-fill {
+  background: var(--warn);
+}
+
+.status-bar.state-force .update-progress-fill {
+  background: var(--accent);
+}
+
+/* 进度条：下载中替下「立即更新」按钮的位置，按百分比填充。 */
+.update-progress {
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #fff;
+  border-radius: 999px;
+  transition: width 0.2s ease-out;
+}
+
+/* 拿不到总大小时的不定量进度条：一截白块来回扫，表示“正在动”。 */
+.update-progress.indeterminate .update-progress-fill {
+  width: 40%;
+  transition: none;
+  animation: update-indet 1.2s ease-in-out infinite;
+}
+
+@keyframes update-indet {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.status-act {
+  flex: none;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-act:active {
+  transform: scale(0.96);
+}
+
+/* 普通更新的按钮走橙色，强制保持主题红（.status-act 默认）。 */
+.status-bar.state-update .status-act {
+  background: var(--warn);
+  color: #1a1200;
+}
+
+/* 常驻的「检查更新」：低调描边小按钮，不抢更新主按钮的视觉。 */
+.status-check {
+  flex: none;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.status-check:hover:not(:disabled) {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.status-check:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 强制更新：盖满全屏、不响应 Esc / 点遮罩的弹框，唯一出口是装新版。 */
+.update-force-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 72;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 5, 7, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.update-force-panel {
+  width: min(460px, calc(100vw - 80px));
+  padding: 26px 30px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--accent);
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
   animation: toast-in 0.16s ease-out;
 }
 
-.update-pill:hover {
-  background: var(--accent-soft);
+.update-force-panel h3 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 19px;
+  letter-spacing: 1px;
 }
 
-.update-pill:disabled {
+.update-force-ver {
+  margin: 10px 0 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 版本号与「检查最新版」按钮同行，按钮贴右侧。 */
+.update-force-ver-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.update-force-ver-row .update-force-ver {
+  margin-right: auto;
+}
+
+.update-force-check {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.update-force-check:hover:not(:disabled) {
+  background: rgba(229, 9, 20, 0.12);
+}
+
+.update-force-check:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-force-notes {
+  margin: 0 0 16px;
   color: var(--muted);
-  border-color: var(--line);
+  font-size: 13px;
+  line-height: 1.7;
+  max-height: 160px;
+  overflow: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.update-force-act {
+  width: 100%;
+  padding: 11px 20px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.update-force-act:active {
+  transform: scale(0.98);
+}
+
+.update-force-busy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-force-busy .update-progress {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.update-force-busy .update-progress-fill {
+  background: var(--accent);
+}
+
+.update-force-status {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 /* ── 「关于」弹层 ─────────────────────────────────────────────────────── */
@@ -939,6 +1218,68 @@ button {
   100% {
     transform: scale(1);
   }
+}
+
+/* 分享面板：紧跟在操作按钮下方，二维码需要白底才扫得出。 */
+.share-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.share-qr {
+  width: 132px;
+  height: 132px;
+  border-radius: 6px;
+  background: #ffffff;
+  flex: none;
+}
+
+.share-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.share-title {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.share-link {
+  display: block;
+  font-size: 12px;
+  color: var(--accent);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.share-copy {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: inherit;
+  font-size: 13px;
+}
+
+.share-copy:hover {
+  border-color: var(--accent);
 }
 
 /* 分集格：Netflix 的季节选择器就是一堆方块号，不需要标题、不需要状态。 */
@@ -1237,6 +1578,7 @@ button {
   z-index: 20;
   display: flex;
   flex-direction: column;
+  padding-bottom: 30px; /* 给底部全局状态栏让位，不让播放器控制条被盖住 */
   background: #05060a;
 }
 
@@ -1254,21 +1596,22 @@ button {
   white-space: nowrap;
 }
 
-/* 顶栏里的面包屑：与分类/详情页同词，按栏高缩字号；min-width:0 让剧名能省略号。 */
+/* 顶栏里的面包屑：与分类/详情页同词同字号，按栏高缩；min-width:0 让剧名能省略号。 */
 .player-crumbs {
   display: flex;
   align-items: baseline;
   gap: 10px;
   min-width: 0;
-}
-
-.player-bar .crumb-home {
   font-size: 14px;
 }
 
 .player-bar .crumb-sep {
-  font-size: 13px;
   flex: none;
+}
+
+/* player-title 不是 flex，拿不到 .player-crumbs 的 gap，分隔符自己留出左右间距 */
+.player-title .crumb-sep {
+  margin: 0 8px;
 }
 
 /* 剧名段：字面就是标题，点它回到进来的详情页。 */
@@ -1284,7 +1627,7 @@ button {
 
 .player-title {
   margin: 0;
-  font-size: 15px;
+  font-size: inherit; /* 顶栏面包屑整行同字号：首页 / › / 剧名 / 集数 */
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1433,7 +1776,8 @@ button {
  * 付费集（webAvailable 为 false）在分集栏上预先禁用置灰；
  * 「正在播的这一格」也走 disabled，但保持高亮不置灰。
  */
-.side-row:disabled {
+.side-row:disabled,
+.side-row.locked {
   cursor: default;
 }
 
@@ -1460,7 +1804,6 @@ button {
   color: #fff;
   border-color: var(--accent);
   background: linear-gradient(180deg, rgba(229, 9, 20, 0.4), rgba(229, 9, 20, 0.16));
-  cursor: default;
 }
 
 @media (max-width: 940px) {
@@ -1625,6 +1968,7 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  margin-bottom: 4px;
   padding: 7px 10px;
   border-radius: 6px;
   color: var(--muted);
@@ -1706,241 +2050,3 @@ button {
   margin-bottom: 14px;
 }
 
-/* ── 红晕光环光标（CursorFX）────────────────────────────────────── */
-
-/*
- * 光标定制只发生在本窗口内（DOM 覆盖层 + CSS，不碰系统光标方案）。生效范围是
- * 整窗无例外，包括播放画面：自绘箭头的热点就在尖角像素上，拖进度条不丢精度。
- * html 也要置 none——首帧内容还没挂上时指针已经可能在内侧，别露出一次系统箭头。
- */
-html,
-body,
-#root,
-.app,
-.player-shell,
-.player-stage video,
-.player-stage video::-webkit-media-controls {
-  cursor: none;
-}
-
-.cursor-fx {
-  position: fixed;
-  inset: 0;
-  z-index: 70; /* 盖过 toaster(60) 与播放器(20)，但 pointer-events 全关，不吞点击。 */
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.cursor-fx[data-hidden="0"] {
-  opacity: 1;
-}
-
-.cursor-ring,
-.cursor-glow {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-/* 光标本体：三个形状共用一个锚点叠放，data-state 只放行一个。 */
-.cursor-shape {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.cursor-shape span {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: none;
-  transform-origin: 2px 2px;
-  animation: cursor-shape-in 0.14s ease-out;
-}
-
-.cursor-fx[data-state="idle"] .cursor-shape-arrow,
-.cursor-fx[data-state="hot"] .cursor-shape-arrow,
-.cursor-fx[data-state="text"] .cursor-shape-ibeam,
-.cursor-fx[data-state="grab"] .cursor-shape-grab {
-  display: block;
-}
-
-@keyframes cursor-shape-in {
-  from {
-    opacity: 0;
-    transform: scale(0.72);
-  }
-}
-
-/* 箭头：白面黑描边，热点在左上尖角；主题红只进光晕，不抢识别度。 */
-.cursor-shape-arrow svg {
-  display: block;
-  filter: drop-shadow(0 0 5px rgba(229, 9, 20, 0.5));
-}
-
-.cursor-shape-arrow path {
-  fill: #fff;
-  stroke: #111;
-  stroke-width: 1.2;
-  stroke-linejoin: round;
-}
-
-/* I 形光标：光环在 text 态已收成细条，这里只补上下两道帽。 */
-.cursor-shape-ibeam {
-  width: 2px;
-  height: 20px;
-  margin: -10px 0 0 -1px;
-  background: var(--text);
-  border-top: 2px solid var(--accent);
-  border-bottom: 2px solid var(--accent);
-  animation:
-    cursor-shape-in 0.14s ease-out,
-    cursor-ibeam-blink 1.1s steps(1) 0.2s infinite;
-}
-
-@keyframes cursor-ibeam-blink {
-  50% {
-    opacity: 0.25;
-  }
-}
-
-/* 抓取手掌；真正拖起来（.dragging 命中 grab 态）时握紧一下。 */
-.cursor-shape-grab {
-  margin: -10px 0 0 -10px;
-}
-
-.cursor-shape-grab svg {
-  display: block;
-  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
-}
-
-.cursor-shape-grab path {
-  fill: var(--text);
-  stroke: var(--accent);
-  stroke-width: 1.2;
-  stroke-linejoin: round;
-}
-
-.cursor-fx[data-state="grab"][data-pressed="1"] .cursor-shape-grab svg {
-  transform: scale(0.86) rotate(-6deg);
-}
-
-.cursor-ring {
-  width: 26px;
-  height: 26px;
-  margin: -13px 0 0 -13px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(229, 9, 20, 0.85);
-  background: transparent;
-  transition:
-    width 0.18s ease,
-    height 0.18s ease,
-    margin 0.18s ease,
-    border-radius 0.18s ease,
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    opacity 0.18s ease;
-}
-
-.cursor-glow {
-  width: 220px;
-  height: 220px;
-  margin: -110px 0 0 -110px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(229, 9, 20, 0.13), transparent 65%);
-}
-
-/* 悬停可点元素：箭头保持不变，放大并浮红的光环就是唯一的悬停反馈。 */
-.cursor-fx[data-state="hot"] .cursor-ring {
-  width: 44px;
-  height: 44px;
-  margin: -22px 0 0 -22px;
-  background: rgba(229, 9, 20, 0.16);
-  border-color: var(--accent);
-}
-
-/* 文本域：光环直接长成一根光标的形状。 */
-.cursor-fx[data-state="text"] .cursor-ring {
-  width: 3px;
-  height: 22px;
-  margin: -11px 0 0 -1.5px;
-  border-radius: 2px;
-  border-color: var(--accent);
-  background: rgba(229, 9, 20, 0.55);
-}
-
-/* 拖动轨道中：环收紧、变白，表示「此刻攥着的是整条轨」。 */
-.cursor-fx[data-state="grab"] .cursor-ring {
-  width: 16px;
-  height: 16px;
-  margin: -8px 0 0 -8px;
-  border-color: rgba(241, 241, 244, 0.9);
-  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.28);
-}
-
-.cursor-trail {
-  position: absolute;
-  inset: 0;
-}
-
-.cursor-mote {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px 0 0 -2.5px;
-  border-radius: 50%;
-  background: rgba(229, 9, 20, 0.85);
-  animation: cursor-mote-out 0.42s ease-out forwards;
-}
-
-@keyframes cursor-mote-out {
-  to {
-    opacity: 0;
-    transform: scale(0.2);
-  }
-}
-
-.cursor-ripples {
-  position: absolute;
-  inset: 0;
-}
-
-.cursor-ripple {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  margin: -9px 0 0 -9px;
-  border-radius: 50%;
-  border: 2px solid rgba(229, 9, 20, 0.8);
-  animation: cursor-ripple-out 0.45s ease-out forwards;
-}
-
-@keyframes cursor-ripple-out {
-  to {
-    opacity: 0;
-    transform: scale(3.4);
-  }
-}
-
-/* 按下反馈：整层 pointer-events:none，:active 轮不到覆盖物自己，由 JS 写 data-pressed。
-   收缩靠 transform，和 JS 写的位置 transform 分层（元素/容器分离）。 */
-.cursor-fx[data-pressed="1"] .cursor-ring {
-  transform: scale(0.82) !important;
-}
-
-.cursor-fx[data-pressed="1"][data-state="hot"] .cursor-ring {
-  transform: scale(0.86) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cursor-mote,
-  .cursor-ripple {
-    display: none;
-  }
-
-  .cursor-shape span,
-  .cursor-shape-ibeam {
-    animation: none;
-  }
-}

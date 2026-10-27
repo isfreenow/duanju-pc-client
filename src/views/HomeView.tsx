@@ -19,7 +19,7 @@ import { useAsync } from "../hooks/useAsync";
 const RECENT_LIMIT = 10;
 
 /** 首页合并的四个红果大类：key 是路由/记录用的类目，label 是行标题前缀。 */
-const ROWS: { category: string; label: string }[] = [
+export const ROWS: { category: string; label: string }[] = [
     { category: "hot-drama", label: "热播短剧" },
     { category: "real-drama", label: "真人剧" },
     { category: "comic-drama", label: "漫剧" },
@@ -27,6 +27,13 @@ const ROWS: { category: string; label: string }[] = [
 ];
 
 const REDGUO = new Set(ROWS.map((row) => row.category));
+
+/** 类目 key → 中文名：详情页面包屑要显示「来自哪一类」。 */
+export function categoryLabel(category: string): string {
+    if (category === "xifan") return "西饭短剧";
+    if (category === "hema") return "河马短剧";
+    return ROWS.find((row) => row.category === category)?.label ?? "";
+}
 
 /** 一行的外壳：标题在左、「查看全部 ›」在右，下面接轨道内容。第三方页签的横向行也复用。 */
 export function RailSection({

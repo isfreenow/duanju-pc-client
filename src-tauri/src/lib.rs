@@ -52,6 +52,7 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -63,6 +64,13 @@ pub fn run() {
                 pending.set(command);
             }
             app.manage(pending);
+            // 把配置里的 duanju 协议关联到当前可执行文件：安装包由 bundler 登记，
+            // 这一步覆盖绿色版；注册失败不拦启动，只是浏览器里点不开而已。
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = app.deep_link().register_all();
+            }
             // 历史放在应用数据目录，跟包体、缓存分开；目录建不出来就退回内存表，
             // 让「记不住进度」成为一个可见的降级，而不是启动失败。
             let dir = app.path().app_data_dir().ok();

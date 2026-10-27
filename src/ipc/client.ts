@@ -88,6 +88,8 @@ export interface ReviewBlock {
 export interface PublicDetails extends PublicMetadata {
   seriesId: string;
   episodeId?: string;
+  /** 剧情简介，三个渠道都从详情里取；没有就不下发。 */
+  description?: string;
   rating?: number;
   ratingCount?: number;
   likeCount?: number;

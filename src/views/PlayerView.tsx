@@ -64,6 +64,7 @@ export function PlayerView({
   category = "",
   onBack,
   onHome,
+  onSeries,
   onSwitch,
 }: {
   episode: Episode;
@@ -74,6 +75,8 @@ export function PlayerView({
   onBack: () => void;
   /** 面包屑首段：直接回首页；没给就退回 onBack。 */
   onHome?: () => void;
+  /** 点剧名：不论从哪进来的，都回该剧详情页；没给就退回 onBack。 */
+  onSeries?: () => void;
   /** 换一集：由外层路由决定去哪儿，播放器自己不存列表。 */
   onSwitch: (episode: Episode, resumeAt?: number) => void;
 }) {
@@ -254,10 +257,11 @@ export function PlayerView({
           </button>
           <span className="crumb-sep" aria-hidden="true">›</span>
           <h2 className="player-title">
-            <button type="button" className="crumb-series" onClick={onBack} title="返回该剧详情页">
+            <button type="button" className="crumb-series" onClick={onSeries ?? onBack} title="返回该剧详情页">
               {episode.seriesTitle}
             </button>
-            {` · 第 ${episode.vidIndex} 集`}
+            <span className="crumb-sep" aria-hidden="true">›</span>
+            {`第 ${episode.vidIndex} 集`}
             {list.length > 0 && ` / 共 ${list.length} 集`}
           </h2>
         </div>

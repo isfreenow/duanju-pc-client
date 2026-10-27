@@ -1,0 +1,16 @@
+<!doctype html>
+<!--
+  Dev-only 预览页：只挂 UpdateBar（走 ?updatebar= 假数据，不碰 Tauri），用来在浏览器里
+  截图验收更新横幅与强制更新弹框的样式。不被 index.html 引用，也不进 Tauri 打包。
+  用法：/update-lab.html?updatebar=idle|download|install|force
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>更新横幅预览</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/updateLab.tsx"></script>
+  </body>
+</html>

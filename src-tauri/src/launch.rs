@@ -8,6 +8,11 @@
 //! 实例：指令暂存进 [`Pending`]，同时广播 `launch-command` 事件，窗口拉回前台。
 //! 前端启动时先 `take` 一次（覆盖冷启动），之后只认事件。
 //!
+//! 浏览器同样能走这条链路：系统把 `duanju://…` 作为 argv 交给新进程，
+//! [`parse`] 认出它再交给 [`parse_url`]——裸负载像剧集 ID（纯数字或 `hema:` /
+//! `xifan:` 前缀）就进 [`LaunchCommand::Series`]，否则当关键词；
+//! `duanju://watch/<关键词>`、`duanju://series/<剧集 ID>` 则没有歧义。
+//!
 //! 例外是 [`SearchTask`]（`--search 关键词`）：它不开窗口，就地打一份带序号的
 //! 结果清单然后退出，让 Agent 能把「第 3 个」这种回答换成下面那条 `--series`。
 //! 它只借用 [`crate::commands::run_search`]，拿不到任何地址或密钥。
@@ -39,15 +44,74 @@ fn series(series_id: String) -> Option<LaunchCommand> {
     (!series_id.is_empty()).then(|| LaunchCommand::Series { series_id: series_id.to_string() })
 }
 
+/// 深链接协议名：浏览器里的 `duanju://…` 链接与 Windows 注册表认的那个。
+pub const URL_SCHEME: &str = "duanju";
+
+/// 解一条 `duanju://…`。地址栏与系统传递时大小写不定，scheme 按不区分比较。
+/// 关键词段做百分号解码（浏览器会把空格写成 `%20`）；剧集 ID 不需要。
+pub fn parse_url(raw: &str) -> Option<LaunchCommand> {
+    let head = raw.get(..URL_SCHEME.len() + 1)?;
+    let matched = head.eq_ignore_ascii_case(&format!("{URL_SCHEME}:")) || head.eq_ignore_ascii_case(&format!("{URL_SCHEME}:/"));
+    if !matched {
+        return None;
+    }
+    let rest = raw[URL_SCHEME.len() + 1..].trim_start_matches('/').trim_end_matches('/');
+    if rest.is_empty() {
+        return None;
+    }
+    if let Some(keyword) = rest.strip_prefix("watch/") {
+        return watch(percent_decode(keyword));
+    }
+    if let Some(series_id) = rest.strip_prefix("series/") {
+        return series(series_id.to_string());
+    }
+    // 裸负载：像剧集 ID 就开播这一部，否则当关键词去搜索，和命令行裸参数同一套逻辑。
+    if looks_like_series_id(rest) {
+        series(rest.to_string())
+    } else {
+        watch(percent_decode(rest))
+    }
+}
+
+/// 纯数字（红果）或带 `hema:` / `xifan:` 这类自描述前缀的才算 ID。
+fn looks_like_series_id(value: &str) -> bool {
+    value.bytes().all(|byte| byte.is_ascii_digit()) || value.contains(':')
+}
+
+/// 只解 `%XX`，解不动的原样保留；URL 里的中文已由浏览器保持原形，不经过这里。
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 3 <= bytes.len() && bytes[i + 1].is_ascii_hexdigit() && bytes[i + 2].is_ascii_hexdigit() {
+            if let Ok(byte) = u8::from_str_radix(&input[i + 1..i + 3], 16) {
+                out.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// 从 argv 取第一条认识的指令；`args[0]` 是可执行文件自身，跳过。
 ///
 /// 认 `--watch|-w <关键词>`、`--series|-s <剧集 ID>`，以及一个裸参数
 /// （`app.exe 吃械入宋` 等价于 `--watch 吃械入宋`）。不认识的其他标志跳过。
+/// `duanju://…` 深链接参数优先于一切标志（见 [`parse_url`]）。
 pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Option<LaunchCommand> {
     let mut it = args.into_iter();
     it.next();
     let mut bare: Option<String> = None;
     while let Some(arg) = it.next() {
+        // 深链接：打包安装后浏览器点 duanju://…，Windows 把它作为 argv 交给新进程，
+        // 冷启动和 single-instance 转交都落回这里，认出即结束，不再看其他标志。
+        if arg.to_lowercase().starts_with(&format!("{URL_SCHEME}:")) {
+            return parse_url(&arg);
+        }
         match arg.as_str() {
             "--watch" | "-w" => return it.next().and_then(watch),
             "--series" | "-s" => return it.next().and_then(series),
@@ -204,7 +268,7 @@ pub fn take_launch_command(pending: tauri::State<'_, Pending>) -> Option<LaunchC
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, parse_search, LaunchCommand};
+    use super::{parse, parse_search, parse_url, LaunchCommand};
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|value| value.to_string()).collect()
@@ -241,5 +305,49 @@ mod tests {
         // 没有 --search 时不拦路；它的参数也不会被误当成剧名（见上条的 parse）。
         assert!(parse_search(args(&["app.exe", "--watch", "持械入宋"])).is_none());
         assert_eq!(parse(args(&["app.exe", "--search", "持械入宋"])), None);
+    }
+
+    #[test]
+    fn a_deep_link_carries_an_id_a_prefixed_id_or_a_keyword() {
+        assert_eq!(
+            parse_url("duanju://7458123456789"),
+            Some(LaunchCommand::Series { series_id: "7458123456789".into() })
+        );
+        // 带自描述前缀的 ID 在 URL 里照原样进负载，不会被当成端口解掉。
+        assert_eq!(
+            parse_url("duanju://hema:41000448669"),
+            Some(LaunchCommand::Series { series_id: "hema:41000448669".into() })
+        );
+        assert_eq!(
+            parse_url("duanju://吃械入宋"),
+            Some(LaunchCommand::Watch { keyword: "吃械入宋".into() })
+        );
+        assert_eq!(
+            parse_url("DUANJU://watch/%E6%8C%81%E6%A2%B0%E5%85%A5%E5%AE%8B"),
+            Some(LaunchCommand::Watch { keyword: "持械入宋".into() })
+        );
+        assert_eq!(
+            parse_url("duanju://series/7458123456789"),
+            Some(LaunchCommand::Series { series_id: "7458123456789".into() })
+        );
+        // 浏览器地址栏里 duanju://id 可能被归一成 duanju:/id 或带尾斜杠。
+        assert_eq!(
+            parse_url("duanju:/7458123456789/"),
+            Some(LaunchCommand::Series { series_id: "7458123456789".into() })
+        );
+        assert_eq!(parse_url("duanju://"), None);
+        assert_eq!(parse_url("https://example.com"), None);
+    }
+
+    #[test]
+    fn argv_deep_link_beats_every_other_flag() {
+        assert_eq!(
+            parse(args(&["app.exe", "duanju://7458123456789"])),
+            Some(LaunchCommand::Series { series_id: "7458123456789".into() })
+        );
+        assert_eq!(
+            parse(args(&["app.exe", "Duanju://watch/持械入宋", "--watch", "别的"])),
+            Some(LaunchCommand::Watch { keyword: "持械入宋".into() })
+        );
     }
 }

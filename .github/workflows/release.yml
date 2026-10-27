@@ -22,6 +22,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       commit: ${{ steps.commit.outputs.sha }}
+      force: ${{ steps.version.outputs.force }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -44,6 +45,15 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "declared: $declared · highest tag: v$highest · next: v$version"
+          # 强制更新开关：读触发这次发版的那条提交正文（此刻 HEAD 还是开发者推的
+          # commit，没被下面的 chore 提交覆盖）。正文写了「强制更新」就把 force 置真，
+          # 由 build job 烘进 release notes，旧客户端的 UpdateBar 据此弹框锁定。
+          if git log -1 --pretty=%B | grep -q "强制更新"; then
+            echo "force=true" >> "$GITHUB_OUTPUT"
+            echo "本次标记为强制更新（提交信息含「强制更新」）"
+          else
+            echo "force=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Sync version into manifests
         run: |
@@ -142,7 +152,7 @@ jobs:
         with:
           tagName: ${{ needs.plan.outputs.tag }}
           releaseName: "短剧随心看 v${{ needs.plan.outputs.version }}"
-          releaseBody: "由 GitHub Actions 自动构建发布（Windows / Linux / macOS）。安装包带 updater 签名，已装的客户端可自动更新；macOS 产物未做开发者签名，首次打开需右键 → 打开。"
+          releaseBody: "${{ needs.plan.outputs.force == 'true' && '【强制更新】此版本必须升级后方可继续使用。' || '' }}由 GitHub Actions 自动构建发布（Windows / Linux / macOS）。安装包带 updater 签名，已装的客户端可自动更新；macOS 产物未做开发者签名，首次打开需右键 → 打开。"
           releaseDraft: false
           prerelease: false
           releaseCommitish: ${{ needs.plan.outputs.commit }}

@@ -154,6 +154,9 @@ pub struct PublicDetails {
     pub episode_id: Option<String>,
     #[serde(flatten)]
     pub metadata: PublicMetadata,
+    /// 剧情简介：官网取 seriesDetail.series_intro，河马/西饭各取自己的简介字段。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub rating: Option<f64>,
     pub rating_count: Option<f64>,
     pub like_count: Option<f64>,
@@ -1099,10 +1102,12 @@ pub fn parse_public_details(
         return Err(ApiError::Input("来源页面分集不匹配".to_string()));
     }
     let social = data.get("seriesSocialInfo").cloned().unwrap_or(Value::Null);
+    let intro = clean_text(data["seriesDetail"].get("series_intro"));
     Ok(PublicDetails {
         series_id: series_id.to_string(),
         episode_id: (!vid.is_empty()).then(|| vid.to_string()),
         metadata: PublicMetadata::from_item(&data["seriesDetail"]),
+        description: (!intro.is_empty()).then_some(intro),
         rating: count(social.get("rating")),
         rating_count: count(social.get("rating_count")),
         like_count: count(social.get("series_like_count")),

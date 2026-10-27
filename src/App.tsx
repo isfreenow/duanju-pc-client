@@ -29,7 +29,7 @@ import type { Episode, LaunchCommand, SeriesCard } from "./ipc/client";
 import { onLaunchCommand, takeLaunchCommand } from "./ipc/client";
 import { syncFavoriteIds } from "./favorites";
 import { useRefreshOnFocus } from "./hooks/useRefreshOnFocus";
-import { HomeView } from "./views/HomeView";
+import { HomeView, categoryLabel } from "./views/HomeView";
 import { CategoryView } from "./views/CategoryView";
 import { BrowseView } from "./views/BrowseView";
 import { SearchView } from "./views/SearchView";
@@ -39,8 +39,7 @@ import { RecentFavoritesView } from "./views/RecentFavoritesView";
 import { WindowControls } from "./components/WindowControls";
 import { AboutDialog } from "./components/AboutDialog";
 import { Toaster } from "./components/Toast";
-import { UpdatePill } from "./updater";
-import { CursorFX } from "./components/CursorFX";
+import { UpdateBar } from "./updater";
 import "./App.css";
 
 const TABS: { key: string; label: string }[] = [
@@ -124,6 +123,14 @@ export default function App() {
     else if (route.view === "all" || route.view === "history") setRoute({ view: "home" });
   };
 
+  // 已经开过播的指令序号：播放页是整窗接管、提前 return 的，回详情页等于重新挂载
+  // 一次 SeriesView，序号不记账就会被重复消费，表现为「点剧名回不了详情页」。
+  const launchedSeq = useRef(new Set<number>());
+
+  /** 这条指令序号是否已在当前详情页消费过；换一部剧（新路由对象）自然重新起算。 */
+  const launchConsumed = (seq: number) => seq > 0 && route.view === "series" && route.autoPlay === seq
+    && launchedSeq.current.has(seq);
+
   /**
    * 一条外部指令换成路由：只负责送到搜索/详情，往下接力开播由那两页自己做。
    *
@@ -133,6 +140,7 @@ export default function App() {
    */
   const launchSeq = useRef(0);
   const applyLaunch = useCallback((command: LaunchCommand) => {
+    launchedSeq.current.clear();
     setTab("home");
     launchSeq.current += 1;
     const seq = launchSeq.current;
@@ -183,11 +191,20 @@ export default function App() {
           category={route.category}
           onBack={back}
           onHome={() => openTab("home")}
+          // 点剧名恒去该剧详情页：从首页「继续观看」直接开播时 from 就是首页，
+          // 再走 back 会回首页；from 沿用播放页的 from，详情页按返回还能回到进来的那一页。
+          onSeries={() =>
+            setRoute({
+              view: "series",
+              seriesId: route.episode.seriesId,
+              category: route.category,
+              from: route.from,
+            })
+          }
           onSwitch={openEpisode}
         />
         <Toaster />
-        <UpdatePill />
-        <CursorFX />
+        <UpdateBar />
       </>
     );
   }
@@ -287,10 +304,15 @@ export default function App() {
             key={`${route.seriesId}:${route.autoPlay ?? 0}`}
             seriesId={route.seriesId}
             category={route.category}
+            categoryLabel={categoryLabel(route.category)}
+            // 红果类目没有独立目录页（在首页里成行），只有第三方页签能点类目名回去。
+            onCategory={THIRD_PARTY.has(route.category) ? () => openTab(route.category) : undefined}
             refresh={refresh}
-            autoPlay={route.autoPlay ?? 0}
+            autoPlay={launchConsumed(route.autoPlay ?? 0) ? 0 : route.autoPlay ?? 0}
+            onAutoPlayed={(seq) => launchedSeq.current.add(seq)}
             onPlay={openEpisode}
             onBack={back}
+            onHome={() => openTab("home")}
             onPick={(card) => openSeries(card, route.category)}
           />
         )}
@@ -300,8 +322,7 @@ export default function App() {
       </main>
       {/* 页内提示：收藏这类即时动作的回馈，不抖弹窗。 */}
       <Toaster />
-      <UpdatePill />
-      <CursorFX />
+      <UpdateBar />
       {about && <AboutDialog onClose={() => setAbout(false)} />}
     </div>
   );

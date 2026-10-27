@@ -508,10 +508,12 @@ pub async fn public_details(client: &reqwest::Client, series_id: &str) -> ApiRes
     let (book_id, _) = parse_id(series_id, false)?;
     let data = detail(client, &book_id).await?;
     let info = data.get("bookInfoVo").cloned().unwrap_or(Value::Null);
+    let intro = plain_text(info.get("introduction")).trim().to_string();
     Ok(PublicDetails {
         series_id: format!("hema:{book_id}"),
         episode_id: None,
         metadata: metadata_from_book(&info),
+        description: (!intro.is_empty()).then_some(intro),
         rating: None,
         rating_count: None,
         like_count: None,

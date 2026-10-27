@@ -462,10 +462,12 @@ pub async fn episode_list(client: &reqwest::Client, series_id: &str) -> ApiResul
 pub async fn public_details(client: &reqwest::Client, series_id: &str) -> ApiResult<PublicDetails> {
     let (source, duanju_id, _) = parse_id(series_id, false)?;
     let result = detail(client, &source, &duanju_id).await?;
+    let intro = plain_text(result.get("desc")).trim().to_string();
     Ok(PublicDetails {
         series_id: format!("xifan:{source}:{duanju_id}"),
         episode_id: None,
         metadata: metadata_from_info(&result),
+        description: (!intro.is_empty()).then_some(intro),
         rating: None,
         rating_count: None,
         like_count: None,
