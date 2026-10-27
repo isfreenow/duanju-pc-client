@@ -1,5 +1,7 @@
 # 短剧随心看
 
+官网：https://duanju.isfreenow.com/
+
 一个在电脑上刷竖屏短剧的小软件。热门榜、分类、搜索都能找剧，点开就播，看到一半关掉，
 下次还能接着上次那一秒继续看。
 
@@ -9,7 +11,7 @@
 [![macOS 下载](https://img.shields.io/badge/下载-macOS-black?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/isfreenow/duanju-pc-client/releases/latest/download/duanju-latest-macos-aarch64.dmg)
 [![Linux 下载](https://img.shields.io/badge/下载-Linux-orange?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/isfreenow/duanju-pc-client/releases/latest/download/duanju-latest-linux.deb)
 
-[![全部版本](https://img.shields.io/badge/全部版本-Intel%20Mac%20·%20AppImage-lightgrey?style=flat-square)](https://github.com/isfreenow/duanju-pc-client/releases/latest)
+
 
 
 
