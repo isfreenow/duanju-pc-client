@@ -132,14 +132,8 @@ pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResul
     })
     .to_string();
 
-    let identity = crate::state::ProcessIdentity::current();
-    let signed = core::signed_video_request(
-        payload.as_bytes(),
-        &core::SignRng::system(),
-        now_millis(),
-        &identity.nonce,
-        identity.started_ms,
-    );
+    let device = core::playback_device(client).await?;
+    let signed = core::playback_request(payload.as_bytes(), device, now_millis());
 
     let response = request_json(
         client,

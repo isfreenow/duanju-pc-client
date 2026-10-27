@@ -22,9 +22,11 @@ pub mod helios;
 pub mod medusa;
 pub mod query;
 pub mod rand;
+pub mod register;
 pub mod sm3;
 pub mod spade;
 pub mod tables;
 
-pub use device::{signed_search_request, signed_video_request, SearchCursor, SignedRequest};
+pub use device::{playback_request, signed_search_request, signed_video_request, SearchCursor, SignedRequest};
 pub use rand::SignRng;
+pub use register::{playback_device, RegisteredDevice};

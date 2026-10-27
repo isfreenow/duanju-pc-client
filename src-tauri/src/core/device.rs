@@ -24,8 +24,9 @@ use super::helios::helios;
 use super::medusa::{build_medusa, md5_hex_upper, SignIdentity};
 use super::query::python_url_encode;
 use super::rand::SignRng;
+use super::register::RegisteredDevice;
 use super::tables::{
-    DEVICE_DEFAULT, SEARCH_API, VIDEO_API, VIDEO_UA, SEARCH_UA,
+    DEVICE_DEFAULT, SEARCH_API, VIDEO_API, VIDEO_UA, PLAYBACK_UA, SEARCH_UA,
 };
 
 /// A fully signed request, ready for the transport layer to send.
@@ -78,6 +79,38 @@ fn ladon(khronos: u32) -> String {
 
 fn argus(khronos: u32) -> String {
     base64::engine::general_purpose::STANDARD.encode(super::bits::le32(khronos as i64))
+}
+
+/// `playbackRequest(payload, identity)` — the video-model endpoint.
+///
+/// Unlike search, this endpoint authenticates on the **registered device
+/// identity alone** (`device_id` / `iid` / `cdid` in the query) and needs none of
+/// the gorgon/medusa/helios headers; the reference sends only UA, Accept and
+/// Content-Type. Minting the ids locally instead of registering makes the gateway
+/// answer 200 with an empty body, so `device` must come from [`register_device`].
+pub fn playback_request(payload: &[u8], device: &RegisteredDevice, now_ms: i64) -> SignedRequest {
+    let mut values: Vec<(&'static str, String)> = DEVICE_DEFAULT
+        .iter()
+        .map(|(key, value)| (*key, value.to_string()))
+        .collect();
+    values.push(("device_id", device.device_id.clone()));
+    values.push(("iid", device.iid.clone()));
+    values.push(("cdid", device.cdid.clone()));
+    values.push(("_rticket", now_ms.to_string()));
+    let query = python_url_encode(&values);
+    let url = format!("{VIDEO_API}?{query}");
+    SignedRequest {
+        url,
+        headers: vec![
+            ("User-Agent".to_string(), PLAYBACK_UA.to_string()),
+            (
+                "Accept".to_string(),
+                "application/json; charset=utf-8,application/x-protobuf".to_string(),
+            ),
+            ("Content-Type".to_string(), "application/json; charset=UTF-8".to_string()),
+        ],
+        body: Some(payload.to_vec()),
+    }
 }
 
 /// `signedVideoRequest(payload)`.

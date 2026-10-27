@@ -132,6 +132,7 @@ pub const APP_TOKEN_MD5: &str = "f7e85ffad7d7dc3bd62ac87057cf6118";
 pub const VIDEO_API: &str = "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/";
 pub const SEARCH_API: &str = "https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v";
 pub const VIDEO_UA: &str = "com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)";
+pub const PLAYBACK_UA: &str = "com.phoenix.read/71532 (Linux; U; Android 9; SM-N9860; Build/PQ3A.190705.10241111;tt-ok/3.12.13.20)";
 pub const SEARCH_UA: &str = "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)";
 
 /// Query parameters shared by every signed request. Order matters: the query
