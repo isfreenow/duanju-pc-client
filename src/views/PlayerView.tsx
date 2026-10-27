@@ -24,6 +24,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   flushHistory,
   getSeriesEpisodes,
@@ -57,6 +58,9 @@ function qualityLabel(stream: PlayableStream): string {
   if (named.length > 0) return named;
   return stream.width > 0 && stream.height > 0 ? `${stream.width}×${stream.height}` : "自动";
 }
+
+const ISSUES_URL = "https://github.com/isfreenow/duanju-pc-client/issues";
+const FEEDBACK_URL = "https://duanju.isfreenow.com/#feedback";
 
 export function PlayerView({
   episode,
@@ -395,16 +399,48 @@ export function PlayerView({
 
       {(support === false || decodeFailed || resolution.error !== null) && (
         <footer className="player-foot">
-          {support === false && <Status tone="warn">这台机器的播放内核不支持这条流，从右上角换一条清晰度试试。</Status>}
+          {support === false &&
+            (streams.some((stream) => codecSupported(mimeFor(stream))) ? (
+              <Status tone="warn">这台机器的播放内核不支持这条流，从右上角换一条清晰度试试。</Status>
+            ) : (
+              // 探测是启动时的快照，装完扩展必须重启应用才会重新判定，文案不要把重启吞掉。
+              <Status tone="warn">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void openUrl("https://apps.microsoft.com/detail/9n4wgh0z6vhq").catch(() => undefined)
+                  }
+                >
+                  安装 HEVC 视频扩展
+                </button>{" "
+                }，重启应用后就能播（这台机器缺 H.265 解码组件，所有清晰度都解不了）。
+              </Status>
+            ))}
           {decodeFailed && support !== false && (
-            <Status tone="warn">播放出错。换一条清晰度，或稍后重试。</Status>
+            <Status tone="warn">
+              播放出错。换一条清晰度，或稍后重试。还是不行？
+              <button type="button" onClick={() => void openUrl(ISSUES_URL).catch(() => undefined)}>
+                去反馈
+              </button>{" "}
+              或到官网
+              <button type="button" onClick={() => void openUrl(FEEDBACK_URL).catch(() => undefined)}>
+                填反馈表
+              </button>
+            </Status>
           )}
           {resolution.error !== null && (
             <Status tone="error">
               <button type="button" onClick={onBack}>
                 返回
               </button>{" "}
-              {resolution.error}
+              {resolution.error} · 反复这样可以去
+              <button type="button" onClick={() => void openUrl(ISSUES_URL).catch(() => undefined)}>
+                提交 issue
+              </button>
+              ，或到官网{" "}
+              <button type="button" onClick={() => void openUrl(FEEDBACK_URL).catch(() => undefined)}>
+                填反馈表
+              </button>
             </Status>
           )}
         </footer>

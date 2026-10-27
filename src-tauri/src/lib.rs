@@ -31,6 +31,24 @@ use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Windows 用户反馈「黑屏但有声音」：流是 HEVC，硬解通路会被 Chromium 的 GPU
+    // 黑名单挡掉（显卡本身支持）。WebView2 的环境变量必须在 Builder 之前设好，
+    // 它会被浏览器进程原样收下；已有人为设值时不覆盖。
+    #[cfg(windows)]
+    std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+        .ok()
+        .filter(|args| args.contains("ignore-gpu-blocklist"))
+        .or_else(|| {
+            // Safe here: still on the main thread before any thread or child process exists.
+            unsafe {
+                std::env::set_var(
+                    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                    "--ignore-gpu-blocklist --enable-features=PlatformHEVCDecoderSupport",
+                );
+            }
+            None
+        });
+
     // `--search 关键词` 是一次性查询：不开窗口、不进 single-instance 那一套，打完字就退。
     if let Some(task) = launch::parse_search(std::env::args()) {
         std::process::exit(launch::search_and_print(task));

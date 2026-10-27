@@ -5,6 +5,8 @@
 一个在电脑上刷竖屏短剧的小软件。热门榜、分类、搜索都能找剧，点开就播，看到一半关掉，
 下次还能接着上次那一秒继续看。
 
+安装包只有 **2.61 MB**，几秒下完、双击就装好，对电脑配置几乎没要求。
+
 ## 下载最新版（双击安装）
 
 [![Windows 下载](https://img.shields.io/badge/下载-Windows-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/isfreenow/duanju-pc-client/releases/latest/download/duanju-latest-windows.exe)
@@ -64,7 +66,8 @@
 > 「帮我搜索短剧 持械入宋」——它会列一张带编号的清单，你回一句「就第 2 个」，它就去播那一部。
 
 > 小提示：本软件仅供学习和研究使用，不收费。个别剧播不出来时，多半是电脑缺一个视频解码组件，
-> 你可以让 AI「帮我装一下 HEVC 视频扩展」，或到微软商店搜索安装。
+> 你可以让 AI「帮我装一下 HEVC 视频扩展」，或点播放页面下的「安装 HEVC 视频扩展」按钮 /
+> 到微软商店搜索安装：<https://apps.microsoft.com/detail/9n4wgh0z6vhq>。
 
 ## 方式二：自己动手点（不用 AI 也行）
 
@@ -81,6 +84,32 @@
 - **同时开两次会不会卡/多开？** 不会。再叫一次只是把已经打开的窗口拉到前面。
 - **搜不到那部剧怎么办？** 它会把最接近的结果列出来给你挑，不会自己乱点。
 - **第一次搜某部剧要等一会？** 正常，多等几秒就好。
+- **有声音但画面黑屏？** 这是电脑缺 H.265（HEVC）解码组件。播放页面会显示「安装 HEVC 视频扩展」
+  按钮，点它跳到微软商店安装（多数电脑装完免费，少数提示付几块钱），装完**重启本软件**就好；
+  也可以直接对 AI 助手说「帮我装一下 HEVC 视频扩展」。
+
+## 遇到问题怎么反馈
+
+按三步来，说清情况就好，不用懂任何技术。
+
+**第 1 步 · 先攒齐 4 条信息。**
+
+1. 你的电脑：Windows / Mac / Linux（不确定的话，看开机画面或屏幕左下角角标）
+2. 软件版本：看软件窗口**底部状态栏**，「短剧随心看」旁边的 `vX.Y.Z` 就是
+3. 哪部剧、哪一集：写剧名就行，能想起第几集更好
+4. 现象：什么时候发生、屏幕上提示了什么（能截图就附一张，注意打码掉头像、账号等私人信息）
+
+**第 2 步 · 选一个最顺手的渠道（三个都行，选你不怕的那个）。**
+
+- **最省事 · 交给 AI**：把第 1 步的 4 条直接发给你的 AI 助手，对它说：
+  > 帮我把这个短剧软件的问题反馈提交到 Issues：<https://github.com/isfreenow/duanju-pc-client/issues>
+- **不想登 GitHub · 官网反馈表**：打开 <https://duanju.isfreenow.com/#feedback>，把第 1 步的 4 条
+  填进去就行（留个邮箱/微信可选，方便我们回复你）。
+- **自己动手 · GitHub Issues**：打开 <https://github.com/isfreenow/duanju-pc-client/issues>，
+  点「New issue」，标题写「现象＋剧名」（例：播放《剧名》第 3 集有声音没画面），正文贴上第 1 步的 4 条。
+
+**第 3 步 · 提交后等回复即可。** 描述越具体，修得越快；修复后会随新版本自动推送到你的软件，
+留意底部状态栏的更新提示就好。
 
 <details>
 <summary><strong>我是开发者 / 想手动操作或接入脚本（点开看技术细节）</strong></summary>
@@ -116,6 +145,9 @@
 - **Tauri v2** 平台依赖：<https://tauri.app/start/prerequisites/>
 - **Windows** 需 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)（多数系统已随 Edge 内置）
 - 部分片源依赖 **HEVC（H.265）解码**，可从微软商店安装 HEVC 视频扩展
+  （<https://apps.microsoft.com/detail/9n4wgh0z6vhq>）；应用启动时已自动向 WebView2 传入
+  `--ignore-gpu-blocklist --enable-features=PlatformHEVCDecoderSupport`，只能救回
+  有硬解但被 GPU 黑名单挡掉的机器，确实缺解码组件的仍需装扩展。
 
 ### 本地部署 / 打包
 

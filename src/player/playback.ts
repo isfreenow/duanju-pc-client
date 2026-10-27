@@ -97,7 +97,7 @@ async function download(url: string, onStage: StageListener): Promise<Bytes> {
  * common answer for these streams and it is not universal: hardware support is
  * what decides it, so probing beats assuming.
  */
-export function codecSupported(mime: string): boolean {
+export function   codecSupported(mime: string): boolean {
   if (typeof document === "undefined") return true;
   const probe = document.createElement("video");
   const verdict = probe.canPlayType(mime);

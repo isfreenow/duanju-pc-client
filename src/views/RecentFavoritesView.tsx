@@ -13,6 +13,7 @@
  */
 
 import { useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
     clearHistory,
     listFavorites,
@@ -108,6 +109,26 @@ export function RecentFavoritesView({
                     {subtitle.length > 0 && " · "}
                     <button type="button" className="link" onClick={retry}>
                         刷新
+                    </button>
+                    <button
+                        type="button"
+                        className="link"
+                        title="播不出来、缺剧集、界面有问题？到 GitHub 提个 issue"
+                        onClick={() =>
+                            void openUrl("https://github.com/isfreenow/duanju-pc-client/issues").catch(() => undefined)
+                        }
+                    >
+                        反馈问题
+                    </button>
+                    <button
+                        type="button"
+                        className="link"
+                        title="不想登 GitHub？在官网页面底部的反馈表里填两句就行"
+                        onClick={() =>
+                            void openUrl("https://duanju.isfreenow.com/#feedback").catch(() => undefined)
+                        }
+                    >
+                        官网反馈表
                     </button>
                 </span>
             </header>
