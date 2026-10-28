@@ -26,17 +26,78 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import QRCode from "qrcode";
 import { toast } from "../components/Toast";
 import { setFavoriteId, useFavoriteIds } from "../favorites";
-import { browseList, getPublicDetails, getSeriesEpisodes, latestProgress, toggleFavorite, type Episode, type SeriesCard } from "../ipc/client";
+import { browseList, cancelDownload, chooseDownloadDir, DOWNLOAD_STAGE, downloadSnapshot, getPublicDetails, getSeriesEpisodes, latestProgress, onDownloadProgress, pauseDownload, resumeDownload, startSeriesDownload, toggleFavorite, type DownloadStage, type DownloadTask, type Episode, type SeriesCard } from "../ipc/client";
 import { clock, episodeOf, SeriesGrid, Skeleton, Status } from "../components/Cards";
 import { useAsync } from "../hooks/useAsync";
 
 function count(value: number | undefined, label: string): string | null {
   if (value === undefined || value <= 0) return null;
   return `${label} ${value >= 10000 ? `${(value / 10000).toFixed(1)} 万` : Math.round(value)}`;
+}
+
+// 下载进度：一部剧只画一条整体进度条。把该剧的多条分集任务聚合。
+type DownloadAggregate = {
+  total: number;
+  done: number;
+  running: boolean;
+  paused: boolean;
+  failed: boolean;
+  allDone: boolean;
+  anyDone: boolean;
+  percent: number;
+  bytesDone: number;
+  bytesTotal: number;
+};
+
+function aggregateTasks(tasks: DownloadTask[]): DownloadAggregate {
+  const total = tasks.length;
+  const done = tasks.filter((task) => task.stage === DOWNLOAD_STAGE.Done).length;
+  const running = tasks.some(
+    (task) =>
+      task.stage === DOWNLOAD_STAGE.Queued ||
+      task.stage === DOWNLOAD_STAGE.Downloading ||
+      task.stage === DOWNLOAD_STAGE.Remuxing,
+  );
+  const paused = tasks.some((task) => task.stage === DOWNLOAD_STAGE.Paused);
+  const failed = tasks.some((task) => task.stage === DOWNLOAD_STAGE.Failed);
+  // 字节求和：已完成的集按全量计入，进行中的集按当前字节，未开始的集 total 为未知。
+  let bytesDone = 0;
+  let bytesTotal = 0;
+  let totalsKnown = true;
+  for (const task of tasks) {
+    bytesDone += task.bytesDone;
+    if (task.bytesTotal !== undefined && task.bytesTotal > 0) bytesTotal += task.bytesTotal;
+    else if (task.stage !== DOWNLOAD_STAGE.Done) totalsKnown = false;
+  }
+  let percent: number;
+  if (total > 0 && done === total) percent = 100;
+  else if (totalsKnown && bytesTotal > 0) percent = Math.min(100, Math.round((bytesDone / bytesTotal) * 100));
+  else percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return {
+    total,
+    done,
+    running,
+    paused,
+    failed,
+    allDone: total > 0 && done === total,
+    anyDone: done > 0,
+    percent,
+    bytesDone,
+    bytesTotal,
+  };
+}
+
+function downloadStageText(agg: DownloadAggregate): string {
+  if (agg.running) return "下载中";
+  if (agg.allDone) return "已完成";
+  if (agg.failed && agg.done === 0) return "全部失败";
+  if (agg.failed) return "部分失败";
+  if (agg.paused) return "已暂停";
+  return "已取消";
 }
 
 const RELATED_LIMIT = 12;
@@ -89,7 +150,12 @@ export function SeriesView({
     cacheKey: `episodes:${seriesId}`,
     keepStale: true,
   });
-  const details = useAsync(() => getPublicDetails(seriesId), [seriesId, refresh]);
+  // 详情（点赞/收藏/评分/简介）同样走会话缓存：先画上一次的结果、后台静默重取，
+  // 返回再进来不闪空 hero；refresh 留在依赖里聚焦时换新，失败时 keepStale 保住旧文案。
+  const details = useAsync(() => getPublicDetails(seriesId), [seriesId, refresh], {
+    cacheKey: `details:${seriesId}`,
+    keepStale: true,
+  });
   const progress = useAsync(() => latestProgress(seriesId), [seriesId, refresh]);
   const pool = useAsync(
     () => browseList(category === "history" ? "hot-drama" : category, "", 1),
@@ -104,6 +170,132 @@ export function SeriesView({
   // 分享面板：进详情页即按官网链接生成二维码 PNG，配复制/浏览器打开两个按钮，没有收起开关。
   const shareUrl = `https://duanju.isfreenow.com/watch/${seriesId}`;
   const [shareQr, setShareQr] = useState<string | null>(null);
+
+  // 下载到电脑：本剧的任务集合（id→任务），进页先拉快照、再订阅增量事件就地更新。
+  // 只关心当前 seriesId 的那几条，其它剧的任务留给「我的」页统一管理。
+  const [downloads, setDownloads] = useState<Record<string, DownloadTask>>({});
+  useEffect(() => {
+    let alive = true;
+    downloadSnapshot()
+      .then((rows) => {
+        if (!alive) return;
+        const next: Record<string, DownloadTask> = {};
+        for (const row of rows) if (row.seriesId === seriesId) next[row.id] = row;
+        setDownloads(next);
+      })
+      .catch(() => undefined);
+    const unlisten = onDownloadProgress((task) => {
+      if (!alive || task.seriesId !== seriesId) return;
+      setDownloads((prev) => ({ ...prev, [task.id]: task }));
+    });
+    return () => {
+      alive = false;
+      void unlisten.then((fn) => fn());
+    };
+  }, [seriesId]);
+
+  const downloadTasks = Object.values(downloads).sort((a, b) => a.vidIndex - b.vidIndex);
+  const downloadActive = downloadTasks.some(
+    (task) =>
+      task.stage === DOWNLOAD_STAGE.Queued ||
+      task.stage === DOWNLOAD_STAGE.Downloading ||
+      task.stage === DOWNLOAD_STAGE.Remuxing,
+  );
+
+  // 一剧一条进度条：暂停/继续/取消都面向该剧全部分集，按行状态批量下发。
+  // 暂停/继续都先把行上的状态就地翻过去（按钮立刻从「暂停」变「继续」），
+  // 再下发给 Rust；Rust 也会当场把状态落定，后续进度事件只会把真实字节补回来。
+  const markStages = (tasks: DownloadTask[], stage: DownloadStage) =>
+    setDownloads((prev) => {
+      const next = { ...prev };
+      for (const task of tasks) {
+        const hit = next[task.id];
+        if (hit !== undefined) next[task.id] = { ...hit, stage };
+      }
+      return next;
+    });
+  const pauseSeriesDownloads = () => {
+    const targets = downloadTasks.filter(
+      (task) =>
+        task.stage === DOWNLOAD_STAGE.Queued ||
+        task.stage === DOWNLOAD_STAGE.Downloading ||
+        task.stage === DOWNLOAD_STAGE.Remuxing,
+    );
+    if (targets.length === 0) return;
+    markStages(targets, DOWNLOAD_STAGE.Paused);
+    for (const task of targets)
+      void pauseDownload(task.id).catch(() => markStages(targets, task.stage));
+  };
+  const resumeSeriesDownloads = () => {
+    const targets = downloadTasks.filter(
+      (task) =>
+        task.stage === DOWNLOAD_STAGE.Paused ||
+        task.stage === DOWNLOAD_STAGE.Failed ||
+        task.stage === DOWNLOAD_STAGE.Cancelled,
+    );
+    if (targets.length === 0) return;
+    markStages(targets, DOWNLOAD_STAGE.Queued);
+    for (const task of targets)
+      void resumeDownload(task.id).catch(() => markStages(targets, task.stage));
+  };
+  const cancelSeriesDownloads = () => {
+    for (const task of downloadTasks)
+      if (task.stage !== DOWNLOAD_STAGE.Done && task.stage !== DOWNLOAD_STAGE.Cancelled)
+        void cancelDownload(task.id);
+  };
+
+  // 打开该剧的保存文件夹：只截成品路径的所在目录（入队时目录就建好，
+  // 取消过也还在），所以没下完也能打开，不依赖有没有成品文件。
+  const revealSeriesFolder = () => {
+    const hit =
+      downloadTasks.find((task) => task.stage === DOWNLOAD_STAGE.Done && task.destPath.length > 0) ??
+      downloadTasks.find((task) => task.destPath.length > 0);
+    if (hit === undefined) {
+      toast("这一部还没有开始下载的文件");
+      return;
+    }
+    const at = Math.max(hit.destPath.lastIndexOf("\\"), hit.destPath.lastIndexOf("/"));
+    if (at <= 0) {
+      toast("没能定位到保存文件夹");
+      return;
+    }
+    void revealItemInDir(hit.destPath.slice(0, at)).catch(() => toast("打开文件夹失败，目录可能已被移动"));
+  };
+
+  // 全剧 = 排除河马取不到地址的付费集；单集下载在播放器里，不在这。
+  const downloadableEpisodes = (list.data?.episodes ?? []).filter(
+    (episode) => !(list.data?.source === "hema" && episode.webAvailable === false),
+  );
+
+  // 排入下载队列：选目录 → 把给定分集批量入队。本集/全剧共用这一条链路。
+  const enqueueDownload = async (episodes: Episode[], label: string) => {
+    const data = list.data;
+    if (data === null) return;
+    if (episodes.length === 0) {
+      toast(`这一部没有可下载的分集`);
+      return;
+    }
+    const destDir = await chooseDownloadDir().catch(() => "");
+    if (destDir.trim() === "") return; // 用户没选目录（取消），不发起
+    try {
+      const rows = await startSeriesDownload({
+        seriesId,
+        seriesTitle: data.seriesTitle,
+        cover: data.cover,
+        category,
+        episodes: episodes.map((episode) => ({ vid: episode.vid, vidIndex: episode.vidIndex })),
+        destDir,
+      });
+      setDownloads((prev) => {
+        const next = { ...prev };
+        for (const row of rows) next[row.id] = row;
+        return next;
+      });
+      toast(`已开始下载${label} ${rows.length} 集 · 进度见下方`);
+    } catch (error) {
+      toast("下载没能开始：" + String(error));
+    }
+  };
 
   const copyShareUrl = async () => {
     try {
@@ -267,6 +459,15 @@ export function SeriesView({
                 </span>
                 {favorited ? "已收藏" : "收藏"}
               </button>
+              <button
+                type="button"
+                className="download-action"
+                disabled={downloadActive}
+                title={downloadActive ? "正在下载全部剧集" : "把整部剧存到本地电脑"}
+                onClick={() => void enqueueDownload(downloadableEpisodes, "全剧")}
+              >
+                下载全剧
+              </button>
             </div>
             {canShare && shareQr !== null && (
               <div className="share-panel">
@@ -300,6 +501,44 @@ export function SeriesView({
                 />
               </span>
             )}
+            {downloadTasks.length > 0 && (() => {
+              const agg = aggregateTasks(downloadTasks);
+              const folderReady = downloadTasks.some((task) => task.destPath.length > 0);
+              return (
+                <div className="download-panel">
+                  <div className="download-panel-head">
+                    <span className="download-panel-title">
+                      下载进度 · {agg.done}/{agg.total} 集 · {downloadStageText(agg)}
+                    </span>
+                    <span className="download-row-act">
+                      {agg.running && (
+                        <button type="button" onClick={pauseSeriesDownloads}>
+                          暂停
+                        </button>
+                      )}
+                      {!agg.running && !agg.allDone && (
+                        <button type="button" onClick={resumeSeriesDownloads}>
+                          继续
+                        </button>
+                      )}
+                      {!agg.allDone && (
+                        <button type="button" onClick={cancelSeriesDownloads}>
+                          取消
+                        </button>
+                      )}
+                      {folderReady && (
+                        <button type="button" onClick={revealSeriesFolder}>
+                          打开所在文件夹
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  <div className="download-bar" aria-hidden="true">
+                    <span className="download-fill" style={{ width: `${agg.percent}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </header>

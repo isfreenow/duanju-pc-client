@@ -39,13 +39,20 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   cancelTranscode,
+  chooseDownloadDir,
+  DOWNLOAD_STAGE,
+  downloadSnapshot,
   flushHistory,
   getSeriesEpisodes,
+  onDownloadProgress,
   onTranscodeProgress,
   prefetchPlay,
   recordProgress,
   resolvePlay,
+  resumeDownload,
+  startSeriesDownload,
   transcodeEpisode,
+  type DownloadTask,
   type Episode,
   type PlayableStream,
   type TranscodeProgress,
@@ -61,6 +68,7 @@ import {
 } from "../player/playback";
 import { useAsync } from "../hooks/useAsync";
 import { Status } from "../components/Cards";
+import { toast } from "../components/Toast";
 import { WindowControls } from "../components/WindowControls";
 
 /** 上报节流：Rust 侧也会挡，但别把 IPC 打在每一次 timeupdate 上。 */
@@ -171,6 +179,8 @@ export function PlayerView({
   const [transcoding, setTranscoding] = useState<TranscodeProgress | null>(null);
   /** 转码失败的一行文案（带下一步）；成功则直接进 prepared。 */
   const [transcodeError, setTranscodeError] = useState<string | null>(null);
+  // ── 下载本集：任务号 = 本集 vid，进页拉快照并按它订阅进度 ──
+  const [episodeDownload, setEpisodeDownload] = useState<DownloadTask | null>(null);
   // ── 自建控制条的镜像态：原生控件被接管后，界面只看这几个值 ──
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -751,6 +761,79 @@ export function PlayerView({
   // 已经在播转码好的本地文件时，不再重申「解不了、装扩展」那套。
   const playingTranscoded = prepared?.summary.startsWith("本机转码") === true;
 
+  // 下载本集：换集时重置并重拉快照，进度事件只认本集那条（任务号 = 本集 vid）。
+  useEffect(() => {
+    let alive = true;
+    setEpisodeDownload(null);
+    downloadSnapshot()
+      .then((rows) => {
+        if (!alive) return;
+        const hit = rows.find((row) => row.id === episode.vid);
+        setEpisodeDownload(hit ?? null);
+      })
+      .catch(() => undefined);
+    const unlisten = onDownloadProgress((task) => {
+      if (!alive || task.id !== episode.vid) return;
+      setEpisodeDownload(task);
+    });
+    return () => {
+      alive = false;
+      void unlisten.then((fn) => fn());
+    };
+  }, [episode.vid]);
+
+  const downloadThisEpisode = async () => {
+    const destDir = await chooseDownloadDir().catch(() => "");
+    if (destDir.trim() === "") return; // 没选目录（取消），不发起
+    try {
+      const rows = await startSeriesDownload({
+        seriesId: episode.seriesId,
+        seriesTitle: episode.seriesTitle,
+        cover: episode.cover,
+        category,
+        episodes: [{ vid: episode.vid, vidIndex: episode.vidIndex }],
+        destDir,
+      });
+      const hit = rows[0];
+      if (hit !== undefined) setEpisodeDownload(hit);
+      toast("已开始下载本集");
+    } catch (error) {
+      toast("下载没能开始：" + String(error));
+    }
+  };
+
+  const dlRunningNow =
+    episodeDownload !== null &&
+    (episodeDownload.stage === DOWNLOAD_STAGE.Queued ||
+      episodeDownload.stage === DOWNLOAD_STAGE.Downloading ||
+      episodeDownload.stage === DOWNLOAD_STAGE.Remuxing);
+  const dlDoneNow = episodeDownload?.stage === DOWNLOAD_STAGE.Done;
+  const dlResumableNow =
+    episodeDownload !== null &&
+    (episodeDownload.stage === DOWNLOAD_STAGE.Paused ||
+      episodeDownload.stage === DOWNLOAD_STAGE.Failed ||
+      episodeDownload.stage === DOWNLOAD_STAGE.Cancelled);
+  const dlPercentNow = (() => {
+    if (episodeDownload === null) return 0;
+    if (episodeDownload.stage === DOWNLOAD_STAGE.Done) return 100;
+    if (episodeDownload.bytesTotal === undefined || episodeDownload.bytesTotal <= 0) return 0;
+    return Math.min(100, Math.round((episodeDownload.bytesDone / episodeDownload.bytesTotal) * 100));
+  })();
+  const downloadEpisodeLabel = dlDoneNow
+    ? "已下载本集"
+    : dlRunningNow
+      ? dlPercentNow > 0
+        ? `下载中 ${dlPercentNow}%`
+        : "下载中…"
+      : dlResumableNow
+        ? "重试下载本集"
+        : "下载本集";
+  const onDownloadEpisodeClick = () => {
+    if (dlRunningNow || dlDoneNow) return;
+    if (dlResumableNow && episodeDownload !== null) void resumeDownload(episodeDownload.id);
+    else void downloadThisEpisode();
+  };
+
   return (
     <section
       className={portrait === null ? "player-shell" : portrait ? "player-shell orient-portrait" : "player-shell orient-landscape"}
@@ -771,6 +854,15 @@ export function PlayerView({
           </h2>
         </div>
         <div className="player-nav">
+          <button
+            type="button"
+            className="quality-toggle download-ep"
+            disabled={dlRunningNow || dlDoneNow}
+            title={dlDoneNow ? "本集已下载到本地" : "把这一集存到本地电脑"}
+            onClick={() => void onDownloadEpisodeClick()}
+          >
+            {downloadEpisodeLabel}
+          </button>
           {streams.length > 1 && (
             <div className="quality" ref={qualityRef}>
               <button type="button" className="quality-toggle" onClick={() => setMenuOpen((open) => !open)}>

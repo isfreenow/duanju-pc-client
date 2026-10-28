@@ -14,15 +14,24 @@
  */
 
 import { useEffect, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
     acknowledgeSeries,
+    cancelDownload,
     checkUpdates,
     clearHistory,
+    DOWNLOAD_STAGE,
+    downloadSnapshot,
+    forgetDownload,
     listFavorites,
     listHistory,
+    onDownloadProgress,
+    pauseDownload,
     removeHistory,
+    resumeDownload,
     toggleFavorite,
+    type DownloadStage,
+    type DownloadTask,
     type FavoriteEntry,
     type ProgressRow,
     type UpdateSummary,
@@ -50,6 +59,63 @@ function ago(updatedAt: number): string {
     return new Date(updatedAt).toLocaleDateString("zh-CN");
 }
 
+/** 一部剧只画一条整体进度：把同剧的多条分集任务聚合。 */
+type DlAggregate = {
+    total: number;
+    done: number;
+    running: boolean;
+    paused: boolean;
+    failed: boolean;
+    allDone: boolean;
+    percent: number;
+};
+
+function dlRunning(task: DownloadTask): boolean {
+    return (
+        task.stage === DOWNLOAD_STAGE.Queued ||
+        task.stage === DOWNLOAD_STAGE.Downloading ||
+        task.stage === DOWNLOAD_STAGE.Remuxing
+    );
+}
+
+function dlResumable(task: DownloadTask): boolean {
+    return (
+        task.stage === DOWNLOAD_STAGE.Paused ||
+        task.stage === DOWNLOAD_STAGE.Failed ||
+        task.stage === DOWNLOAD_STAGE.Cancelled
+    );
+}
+
+function aggregateDl(tasks: DownloadTask[]): DlAggregate {
+    const total = tasks.length;
+    const done = tasks.filter((task) => task.stage === DOWNLOAD_STAGE.Done).length;
+    const running = tasks.some(dlRunning);
+    const paused = tasks.some((task) => task.stage === DOWNLOAD_STAGE.Paused);
+    const failed = tasks.some((task) => task.stage === DOWNLOAD_STAGE.Failed);
+    let bytesDone = 0;
+    let bytesTotal = 0;
+    let totalsKnown = true;
+    for (const task of tasks) {
+        bytesDone += task.bytesDone;
+        if (task.bytesTotal !== undefined && task.bytesTotal > 0) bytesTotal += task.bytesTotal;
+        else if (task.stage !== DOWNLOAD_STAGE.Done) totalsKnown = false;
+    }
+    let percent: number;
+    if (total > 0 && done === total) percent = 100;
+    else if (totalsKnown && bytesTotal > 0) percent = Math.min(100, Math.round((bytesDone / bytesTotal) * 100));
+    else percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { total, done, running, paused, failed, allDone: total > 0 && done === total, percent };
+}
+
+function dlStageText(agg: DlAggregate): string {
+    if (agg.running) return "下载中";
+    if (agg.allDone) return "已完成";
+    if (agg.failed && agg.done === 0) return "全部失败";
+    if (agg.failed) return "部分失败";
+    if (agg.paused) return "已暂停";
+    return "已取消";
+}
+
 export function RecentFavoritesView({
     refresh,
     onPick,
@@ -68,6 +134,8 @@ export function RecentFavoritesView({
     const [hiddenHist, setHiddenHist] = useState<Set<string>>(() => new Set());
     // 追剧检测结果（seriesId → 新集/续作数）：角标只读这里，失败就是没角标。
     const [updates, setUpdates] = useState<Map<string, UpdateSummary>>(() => new Map());
+    // 下载任务管理区：本位页只管“一切任务”（不分期剧）：进页拉快照 + 订阅增量。
+    const [downloads, setDownloads] = useState<Record<string, DownloadTask>>({});
 
     const loaded = favRows ?? favorites.data ?? [];
     const favList = [...loaded].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -107,6 +175,31 @@ export function RecentFavoritesView({
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [favIds.join("|"), histIds.join("|"), refresh]);
+
+    // 下载任务：进页先拉一次全量快照，再订阅进度事件就地更新（与详情页共用后端）。
+    useEffect(() => {
+        let alive = true;
+        downloadSnapshot()
+            .then((rows) => {
+                if (!alive) return;
+                const next: Record<string, DownloadTask> = {};
+                for (const row of rows) next[row.id] = row;
+                setDownloads(next);
+            })
+            .catch(() => undefined);
+        const unlisten = onDownloadProgress((task) => {
+            if (!alive) return;
+            setDownloads((prev) => {
+                const next = { ...prev, [task.id]: task };
+                // 服务端彻底丢拖一个已消失的任务（forget）时事件不会再来，这里只管更新。
+                return next;
+            });
+        });
+        return () => {
+            alive = false;
+            void unlisten.then((fn) => fn());
+        };
+    }, []);
 
     // 点卡片进详情就算「看过了」：把这部剧的角标就地清掉，存失败也不回头——
     // 角标只是提示，宁可少画一次也不把已发生的动作撤回。
@@ -171,10 +264,98 @@ export function RecentFavoritesView({
         }
     };
 
+    // 一剧一行：行内的批量动作面向该剧所有分集（只下发任务号，不碰地址）。
+    // 暂停/继续先把行上的状态就地翻过去，按钮立刻跟着变；Rust 也会当场落定状态，
+    // 下发失败才把这一行退回原状。
+    const markStages = (tasks: DownloadTask[], stage: DownloadStage) =>
+        setDownloads((prev) => {
+            const next = { ...prev };
+            for (const task of tasks) {
+                const hit = next[task.id];
+                if (hit !== undefined) next[task.id] = { ...hit, stage };
+            }
+            return next;
+        });
+    const pauseGroup = (tasks: DownloadTask[]) => {
+        const targets = tasks.filter(dlRunning);
+        if (targets.length === 0) return;
+        markStages(targets, DOWNLOAD_STAGE.Paused);
+        for (const task of targets) void pauseDownload(task.id).catch(() => markStages(targets, task.stage));
+    };
+    const resumeGroup = (tasks: DownloadTask[]) => {
+        const targets = tasks.filter(dlResumable);
+        if (targets.length === 0) return;
+        markStages(targets, DOWNLOAD_STAGE.Queued);
+        for (const task of targets) void resumeDownload(task.id).catch(() => markStages(targets, task.stage));
+    };
+    const cancelGroup = (tasks: DownloadTask[]) => {
+        for (const task of tasks)
+            if (task.stage !== DOWNLOAD_STAGE.Done && task.stage !== DOWNLOAD_STAGE.Cancelled)
+                void cancelDownload(task.id);
+    };
+
+    // 从列表移除一剧的全部已结束任务（不删本地成品），就地隐掉；失败回拉一次对齐。
+    const forgetGroup = async (tasks: DownloadTask[]) => {
+        const title = tasks[0]?.seriesTitle ?? "";
+        const ids = tasks.map((task) => task.id);
+        setDownloads((prev) => {
+            const next = { ...prev };
+            for (const id of ids) delete next[id];
+            return next;
+        });
+        toast(`已从列表移除《${title}》的下载记录`);
+        try {
+            await Promise.all(ids.map((id) => forgetDownload(id, false)));
+        } catch {
+            const rows = await downloadSnapshot().catch(() => []);
+            setDownloads(Object.fromEntries(rows.map((row) => [row.id, row])));
+            toast("移除没存上，已回到原样");
+        }
+    };
+
+    // 打开该剧的保存文件夹：只截成品路径的所在目录（入队时目录就建好），
+    // 所以没下完也能打开；优先指一条已完成分集所在目录，全是半成品也能打开。
+    const revealGroup = (tasks: DownloadTask[]) => {
+        const hit =
+            tasks.find((task) => task.stage === DOWNLOAD_STAGE.Done && task.destPath.length > 0) ??
+            tasks.find((task) => task.destPath.length > 0);
+        if (hit === undefined) {
+            toast("这一部还没有开始下载的文件");
+            return;
+        }
+        const at = Math.max(hit.destPath.lastIndexOf("\\"), hit.destPath.lastIndexOf("/"));
+        if (at <= 0) {
+            toast("没能定位到保存文件夹");
+            return;
+        }
+        void revealItemInDir(hit.destPath.slice(0, at)).catch(() => toast("打开文件夹失败，目录可能已被移动"));
+    };
+
     const subtitle = [
         favList.length > 0 ? `${favList.length} 部收藏` : null,
         watched.length > 0 ? `${watched.length} 部最近看过` : null,
     ].filter(Boolean).join(" · ");
+
+    // 下载区：按剧分组，一剧一行（一条整体进度）。进行中的排前（按更新时间新→旧）。
+    const dlGroups = (() => {
+        const bySeries = new Map<string, DownloadTask[]>();
+        for (const task of Object.values(downloads)) {
+            const arr = bySeries.get(task.seriesId);
+            if (arr === undefined) bySeries.set(task.seriesId, [task]);
+            else arr.push(task);
+        }
+        return [...bySeries.entries()]
+            .map(([seriesId, tasks]) => ({
+                seriesId,
+                tasks,
+                title: tasks[0]?.seriesTitle ?? "",
+                cover: tasks[0]?.cover ?? "",
+                agg: aggregateDl(tasks),
+                newest: Math.max(...tasks.map((task) => task.updatedAt)),
+            }))
+            .sort((a, b) => (b.agg.running ? 1 : 0) - (a.agg.running ? 1 : 0) || b.newest - a.newest);
+    })();
+    const dlActiveCount = dlGroups.filter((group) => group.agg.running).length;
 
     return (
         <section className="view">
@@ -186,26 +367,6 @@ export function RecentFavoritesView({
                     <button type="button" className="link" onClick={retry}>
                         刷新
                     </button>
-                    <button
-                        type="button"
-                        className="link"
-                        title="播不出来、缺剧集、界面有问题？到 GitHub 提个 issue"
-                        onClick={() =>
-                            void openUrl("https://github.com/isfreenow/duanju-pc-client/issues").catch(() => undefined)
-                        }
-                    >
-                        反馈问题
-                    </button>
-                    <button
-                        type="button"
-                        className="link"
-                        title="不想登 GitHub？在官网页面底部的反馈表里填两句就行"
-                        onClick={() =>
-                            void openUrl("https://duanju.isfreenow.com/#feedback").catch(() => undefined)
-                        }
-                    >
-                        官网反馈表
-                    </button>
                 </span>
             </header>
 
@@ -216,6 +377,48 @@ export function RecentFavoritesView({
                         重试
                     </button>
                 </Status>
+            )}
+
+            {dlGroups.length > 0 && (
+                <section className="download-section" aria-label="下载任务">
+                    <h3>下载任务{dlActiveCount > 0 ? ` · ${dlActiveCount} 部进行中` : ""}</h3>
+                    <div className="dl-list">
+                        {dlGroups.map((group) => (
+                            <div key={group.seriesId} className={`dl-item dl-${group.agg.running ? "downloading" : group.agg.allDone ? "done" : group.agg.paused ? "paused" : "failed"}`}>
+                                {group.cover.length > 0 && <img className="dl-cover" src={group.cover} alt={group.title} />}
+                                <div className="dl-main">
+                                    <div className="dl-line">
+                                        <span className="dl-title" onClick={() => onPick(group.seriesId)}>
+                                            {group.title}
+                                        </span>
+                                        <span className="dl-ep">{group.agg.done}/{group.agg.total} 集</span>
+                                        <span className="dl-state">{dlStageText(group.agg)}</span>
+                                    </div>
+                                    <div className="dl-track">
+                                        <span className="dl-fill" style={{ width: `${group.agg.percent}%` }} />
+                                    </div>
+                                </div>
+                                <div className="dl-acts">
+                                    {group.agg.running && (
+                                        <button type="button" onClick={() => pauseGroup(group.tasks)}>暂停</button>
+                                    )}
+                                    {!group.agg.running && !group.agg.allDone && (
+                                        <button type="button" onClick={() => resumeGroup(group.tasks)}>继续</button>
+                                    )}
+                                    {!group.agg.allDone && (
+                                        <button type="button" onClick={() => cancelGroup(group.tasks)}>取消</button>
+                                    )}
+                                    {group.tasks.some((task) => task.destPath.length > 0) && (
+                                        <button type="button" onClick={() => revealGroup(group.tasks)}>打开所在文件夹</button>
+                                    )}
+                                    {!group.agg.running && (
+                                        <button type="button" className="danger" onClick={() => void forgetGroup(group.tasks)}>移除</button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
             )}
 
             {favList.length === 0 && watched.length === 0 && error === null && (

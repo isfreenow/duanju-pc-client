@@ -493,3 +493,112 @@ export async function onLaunchCommand(
   if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return () => { };
   return listen<LaunchCommand>("launch-command", (event) => handler(event.payload));
 }
+
+// ── 下载到电脑 ────────────────────────────────────────────────────────────
+
+/**
+ * 任务状态，逐一对应 Rust 的 `download::stage`。字符串是前后端契约，改名要同步
+ * 两侧——用常量而非 enum，序列化值和比较值必须一致，否则门控静默失效。
+ */
+export const DOWNLOAD_STAGE = {
+  Queued: "queued",
+  Downloading: "downloading",
+  Remuxing: "remuxing",
+  Paused: "paused",
+  Done: "done",
+  Failed: "failed",
+  Cancelled: "cancelled",
+} as const;
+
+export type DownloadStage = (typeof DOWNLOAD_STAGE)[keyof typeof DOWNLOAD_STAGE];
+
+/**
+ * 一条下载任务（`download::DownloadTask`）。没有任何地址或密钥：`destPath` 是本
+ * 地成品路径，其余是渲染进度与断点续传所需元数据。`bytesTotal` 在总量未知时为 undefined。
+ */
+export interface DownloadTask {
+  id: string;
+  seriesId: string;
+  seriesTitle: string;
+  cover: string;
+  category: string;
+  vidIndex: number;
+  quality: string;
+  destPath: string;
+  stage: DownloadStage;
+  bytesDone: number;
+  bytesTotal?: number;
+  error?: string;
+  updatedAt: number;
+}
+
+/** 排进队列的一集：只有编号与集号，地址与密钥都留在 Rust 侧解析。 */
+export interface DownloadEpisodeInput {
+  vid: string;
+  vidIndex: number;
+}
+
+/** 当前所有下载任务（含已完成/失败/取消），供「我的」页与详情页渲染。 */
+export function downloadSnapshot(): Promise<DownloadTask[]> {
+  return call<DownloadTask[]>("download_snapshot");
+}
+
+/**
+ * 弹出原生「选择保存目录」对话框（由 Rust 完成），取消选择回空串——
+ * 前端据此判断用户是否真的选了位置，再决定是否发起下载。
+ */
+export function chooseDownloadDir(): Promise<string> {
+  return call<string>("choose_download_dir");
+}
+
+/** 把一部剧的分集整批排进下载队列并起 worker，返回入队后的任务列表。 */
+export function startSeriesDownload(input: {
+  seriesId: string;
+  seriesTitle: string;
+  cover: string;
+  category?: string;
+  quality?: string;
+  episodes: DownloadEpisodeInput[];
+  destDir: string;
+}): Promise<DownloadTask[]> {
+  return call<DownloadTask[]>("start_series_download", {
+    seriesId: input.seriesId,
+    seriesTitle: input.seriesTitle,
+    cover: input.cover,
+    category: input.category ?? "",
+    quality: input.quality ?? "",
+    episodes: input.episodes,
+    destDir: input.destDir,
+  });
+}
+
+/** 继续一条已暂停/失败/取消的任务（从断点续传）。 */
+export function resumeDownload(id: string): Promise<boolean> {
+  return call<boolean>("resume_download", { id });
+}
+
+/** 暂停一条在跑或排队中的任务，保留已下字节供续传。 */
+export function pauseDownload(id: string): Promise<boolean> {
+  return call<boolean>("pause_download", { id });
+}
+
+/** 取消一条任务并删掉它的半截字节（成品不动）。 */
+export function cancelDownload(id: string): Promise<boolean> {
+  return call<boolean>("cancel_download", { id });
+}
+
+/** 从列表里移除一条已结束的任务，`deleteFile` 为真时连带删本地成品。 */
+export function forgetDownload(id: string, deleteFile = false): Promise<boolean> {
+  return call<boolean>("forget_download", { id, deleteFile });
+}
+
+/**
+ * 订阅下载进度事件：每帧载荷是一条更新后的 `DownloadTask`。返回取消订阅；
+ * 纯浏览器预览下没有运行时，给一个空操作。
+ */
+export async function onDownloadProgress(
+  handler: (task: DownloadTask) => void,
+): Promise<() => void> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return () => { };
+  return listen<DownloadTask>("download-progress", (event) => handler(event.payload));
+}

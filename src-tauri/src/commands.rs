@@ -11,13 +11,15 @@
 //! itself: `hema:<bookId>` and `xifan:<source>:<duanjuId>` are self-describing,
 //! and a bare number is the website's. The webview never names a host.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 
 use crate::api::app_search::{SearchPageCursor, SearchResult};
 use crate::api::app_video::MediaVariant;
 use crate::api::web::{CatalogPage, EpisodeList, PublicDetails};
 use crate::api::{self, ApiError};
+use crate::download::{DownloadManager, DownloadTask};
 use crate::favorites::{self, FavoriteEntry};
 use crate::history::{self, HistoryEntry};
 use crate::play_cache::PlayCache;
@@ -275,8 +277,9 @@ pub async fn get_public_details(
 ///
 /// 与 [`resolve_play`] 的区别是这里多一个 `prefetch_rank`：它是**会话缓存在内存里的
 /// 那一份**。前端拿到的仍是只含 url + 密钥的 DTO，边界没动；但转码要拉本片字节时，
-/// 需要知道该带哪一套请求头，那套头不应该下给前端。
-async fn assemble_streams(
+/// 需要知道该带哪一套请求头，那套头不应该下给前端。下载引擎（`download`）续传/重试
+/// 时也要重新解一条新鲜地址，故对 crate 内可见。
+pub(crate) async fn assemble_streams(
     client: &reqwest::Client,
     vid: &str,
     series: &str,
@@ -544,6 +547,131 @@ pub async fn transcode_episode(
 #[tauri::command]
 pub async fn cancel_transcode(job: String) -> Result<bool, CommandError> {
     Ok(transcode::cancel(&job))
+}
+
+// ── 下载到电脑 ────────────────────────────────────────────────────────────
+
+/// 前端排进下载队列的一集：只有编号与集号，没有任何地址或密钥。
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadEpisodeInput {
+    pub vid: String,
+    pub vid_index: u32,
+}
+
+/// 当前所有下载任务（含已完成/失败/取消），供「我的」页与详情页渲染。
+#[tauri::command]
+pub async fn download_snapshot(
+    manager: State<'_, DownloadManager>,
+) -> Result<Vec<DownloadTask>, CommandError> {
+    Ok(manager.snapshot())
+}
+
+/// 弹出原生「选择保存目录」对话框，由 Rust 侧完成，前端与 capability 都不碰文件系统。
+/// 取消选择回空串（前端据此不再发起下载）。
+#[tauri::command]
+pub async fn choose_download_dir(app: AppHandle) -> Result<String, CommandError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |folder| {
+        let _ = tx.send(folder.map(|path| path.to_string()));
+    });
+    rx.await
+        .map_err(|_| CommandError {
+            code: "DIALOG".to_string(),
+            hint: None,
+            message: "目录选择被中断".to_string(),
+        })
+        .map(|picked| picked.unwrap_or_default())
+}
+
+/// 把一部剧的分集整批排进下载队列并起 worker。已在跑/已完成的不重复拉起。
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn start_series_download(
+    app: AppHandle,
+    manager: State<'_, DownloadManager>,
+    series_id: String,
+    series_title: String,
+    cover: String,
+    category: Option<String>,
+    quality: Option<String>,
+    episodes: Vec<DownloadEpisodeInput>,
+    dest_dir: String,
+) -> Result<Vec<DownloadTask>, CommandError> {
+    if dest_dir.trim().is_empty() {
+        return Err(CommandError {
+            code: "INPUT".to_string(),
+            hint: Some("先选一个保存目录".to_string()),
+            message: "还没有选择保存位置".to_string(),
+        });
+    }
+    let quality = quality.unwrap_or_default();
+    let category = category.unwrap_or_default();
+    let metas = episodes
+        .into_iter()
+        .filter(|episode| !episode.vid.is_empty())
+        .map(|episode| DownloadTask {
+            id: episode.vid,
+            series_id: series_id.clone(),
+            series_title: series_title.clone(),
+            cover: cover.clone(),
+            category: category.clone(),
+            vid_index: episode.vid_index,
+            quality: quality.clone(),
+            dest_path: String::new(),
+            stage: crate::download::stage::QUEUED.to_string(),
+            bytes_done: 0,
+            bytes_total: None,
+            error: None,
+            updated_at: api::now_millis(),
+        })
+        .collect::<Vec<_>>();
+    if metas.is_empty() {
+        return Err(CommandError {
+            code: "INPUT".to_string(),
+            hint: Some("这一部没有可下载的分集".to_string()),
+            message: "没有可下载的分集".to_string(),
+        });
+    }
+    Ok(manager.begin(&app, metas, &dest_dir))
+}
+
+/// 继续一条已暂停/失败/取消的任务（从断点续传）。
+#[tauri::command]
+pub async fn resume_download(
+    app: AppHandle,
+    manager: State<'_, DownloadManager>,
+    id: String,
+) -> Result<bool, CommandError> {
+    Ok(manager.resume(&app, &id))
+}
+
+/// 暂停一条在跑或排队中的任务，保留已下字节供续传。
+#[tauri::command]
+pub async fn pause_download(
+    manager: State<'_, DownloadManager>,
+    id: String,
+) -> Result<bool, CommandError> {
+    Ok(manager.pause(&id))
+}
+
+/// 取消一条任务并删掉它的半截字节（成品不动）。
+#[tauri::command]
+pub async fn cancel_download(
+    manager: State<'_, DownloadManager>,
+    id: String,
+) -> Result<bool, CommandError> {
+    Ok(manager.cancel(&id))
+}
+
+/// 从列表里移除一条已结束的任务，`delete_file` 为真时连带删本地成品。
+#[tauri::command]
+pub async fn forget_download(
+    manager: State<'_, DownloadManager>,
+    id: String,
+    delete_file: Option<bool>,
+) -> Result<bool, CommandError> {
+    Ok(manager.forget(&id, delete_file.unwrap_or(false)))
 }
 
 /// 记录「看到哪儿」。落盘的只有剧名、集号、秒数与来源页签。

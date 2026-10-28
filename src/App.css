@@ -2362,3 +2362,221 @@ button.status-brand:hover {
   margin-bottom: 14px;
 }
 
+/* ── 下载到电脑 ────────────────────────────────────────────── */
+
+/* 详情页的「下载全剧」：与收藏开关同一行，体量一致不抢主动作权重。 */
+.download-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: inherit;
+  font-size: 15px;
+  transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.download-action:hover {
+  border-color: var(--accent);
+}
+
+.download-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 详情页进度面板：挂在操作行下方，逐集一行，行内进度条 + 暂停/继续/取消。 */
+.download-panel {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  max-width: 520px;
+}
+
+.download-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.download-panel-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-row-act {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+
+.download-row-act button {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.download-row-act button:hover {
+  border-color: var(--muted);
+}
+
+.download-bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.download-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* 「我的」页的下载任务管理区：封面 + 多行信息 + 右侧动作按钮。 */
+.download-section {
+  margin-top: 6px;
+}
+
+.download-section h3 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.dl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dl-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.dl-cover {
+  flex: none;
+  width: 44px;
+  height: 60px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.dl-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dl-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dl-title {
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-title:hover {
+  color: var(--accent);
+}
+
+.dl-ep {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dl-state {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dl-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.dl-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.dl-sub {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.dl-acts {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 220px;
+  justify-content: flex-end;
+}
+
+.dl-acts button {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.dl-acts button:hover {
+  border-color: var(--muted);
+}
+
+/* 状态着色：完成绿、失败红、暂停暗。 */
+.dl-done .dl-fill,
+.dl-done .download-fill {
+  background: #2ea043;
+}
+
+.dl-failed .dl-fill,
+.dl-failed .download-fill {
+  background: var(--accent);
+}
+
+.dl-failed .dl-state {
+  color: #ff5a5f;
+}
+
+.dl-paused .dl-fill,
+.dl-paused .download-fill {
+  background: var(--muted);
+}
+

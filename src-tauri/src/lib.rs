@@ -21,6 +21,7 @@
 pub mod api;
 pub mod commands;
 pub mod core;
+pub mod download;
 pub mod favorites;
 pub mod history;
 pub mod launch;
@@ -29,9 +30,9 @@ pub mod state;
 pub mod transcode;
 
 use commands::App;
-use tauri::{tray::TrayIconBuilder, Emitter, Manager};
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::WindowEvent;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::{Emitter, Manager, tray::TrayIconBuilder};
 #[cfg(all(desktop, not(debug_assertions)))]
 use tauri_plugin_updater::UpdaterExt;
 
@@ -62,7 +63,9 @@ fn stamp_red_dot(mut rgba: Vec<u8>, size: u32) -> Vec<u8> {
 /// 拿不到 exe 内嵌图标（非 Windows / 无资源）就静默跳过，不影响主流程。
 #[cfg(desktop)]
 fn set_tray_badge(app: &tauri::AppHandle, on: bool, version: Option<&str>) {
-    let Some(tray) = app.tray_by_id("main-tray") else { return };
+    let Some(tray) = app.tray_by_id("main-tray") else {
+        return;
+    };
     if on {
         #[cfg(windows)]
         if let Ok(img) = tauri::image::Image::from_app_icon_resource(32) {
@@ -97,8 +100,14 @@ mod tray_badge_tests {
         assert_eq!(px(23, 23), (225, 19, 31, 255), "dot centre");
         assert_eq!(px(3, 3), (0, 0, 0, 0), "untouched far corner");
         // 描边白环的存在性用计数断言，不赌边界单像素的浮点比较
-        let whites = out.chunks_exact(4).filter(|p| **p == [255, 255, 255, 255]).count();
-        let reds = out.chunks_exact(4).filter(|p| **p == [225, 19, 31, 255]).count();
+        let whites = out
+            .chunks_exact(4)
+            .filter(|p| **p == [255, 255, 255, 255])
+            .count();
+        let reds = out
+            .chunks_exact(4)
+            .filter(|p| **p == [225, 19, 31, 255])
+            .count();
         assert!((20..200).contains(&whites), "stroke ring pixels = {whites}");
         assert!((20..300).contains(&reds), "dot body pixels = {reds}");
         assert_eq!(out.len(), (size * size * 4) as usize, "same buffer size");
@@ -152,6 +161,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(app_state)
@@ -189,7 +199,15 @@ pub fn run() {
             app.manage(play_cache::PlayCache::new());
             // 转码工具的目录布局钉在应用数据目录；目录拿不到就钉在当前目录，
             // 让「转码不可用」成为一个可见的降级，而不是启动失败。
-            app.manage(transcode::Layout::new(&fav_dir));
+            let layout = transcode::Layout::new(&fav_dir);
+            app.manage(layout.clone());
+            // 下载管理器复用同一份目录布局与工作目录，与转码共享按需下载的 FFmpeg；
+            // 客户端与 App 状态同源，续传/重试时重新解一条新鲜地址。
+            app.manage(download::DownloadManager::open(
+                &fav_dir,
+                app.state::<App>().client.clone(),
+                layout,
+            ));
             // 常驻托盘：主窗口「关闭」只是隐藏（见 on_window_event），进程不退出，
             // AI 调用（duanju:// 深链接、CLI）才能秒级拉起窗口而不必冷启动整个应用。
             // 右键菜单「退出程序」才是唯一真正的退出出口。
@@ -300,6 +318,13 @@ pub fn run() {
             commands::prepare_transcode,
             commands::transcode_episode,
             commands::cancel_transcode,
+            commands::download_snapshot,
+            commands::choose_download_dir,
+            commands::start_series_download,
+            commands::resume_download,
+            commands::pause_download,
+            commands::cancel_download,
+            commands::forget_download,
             commands::record_progress,
             commands::list_history,
             commands::latest_progress,

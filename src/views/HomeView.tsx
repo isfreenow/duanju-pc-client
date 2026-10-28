@@ -142,14 +142,15 @@ export function HomeView({
     onSeeAll: (category: string, genre: string) => void;
 }) {
     // 一次取四个类目的首页：既给「总览行」出内容，又读出各类目的题材清单。
-    // 整组请求失败（进程被挂起后醒来一类）时留旧片单，别把首页抹回骨架屏。
+    // cacheKey 固定不带 refresh：先画上一次缓存的片单，refresh 只留在依赖里驱动后台
+    // 静默重取（revalidate），聚焦/返回才不倒回骨架屏。整组请求失败时 keepStale 留旧片单。
     const meta = useAsync(
         () => Promise.all(ROWS.map((row) => browseList(row.category, "", 1).catch(() => null))),
         [refresh],
-        { cacheKey: `home:meta:${refresh}`, keepStale: true },
+        { cacheKey: "home:meta", keepStale: true },
     );
     const recent = useAsync(() => listHistory(""), [refresh], {
-        cacheKey: `home:recent:${refresh}`,
+        cacheKey: "home:recent",
         keepStale: true,
     });
     const recentRows = useMemo(

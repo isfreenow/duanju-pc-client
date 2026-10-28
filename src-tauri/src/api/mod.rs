@@ -463,6 +463,201 @@ pub async fn fetch_binary(
     Err(ApiError::TooManyRedirects)
 }
 
+/// 块间流控：`download_stream` 每写完一块就回调调用方，由它决定下一条怎么办。
+/// 暂停与取消只能在块与块之间生效（一次长连接中途停不下来），这也是把
+/// 下载拆成多 `Range` 块的意义。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DownloadFlow {
+    Continue,
+    Pause,
+    Cancel,
+}
+
+/// 断点续传下载：从磁盘已有的字节数起，用 `Range: bytes=<off>-` 接着往 `path`
+/// 追加，逐块回报绝对进度并让调用方在块间选择继续/暂停/取消。
+///
+/// 与 [`fetch_binary`] 的区别：① 可续——起点以磁盘文件实际大小为准，调用方
+/// 不需要传；② 能解析总量（从 `Content-Range` 或 `Content-Length`）；③ 块间可停。
+/// 返回 `(已落盘绝对字节, 总量, 是否下完)`；暂停时第三个为 `false`，且已写入的
+/// 部分保留在 `path` 里供下次续。超时/网络错时不删文件（下次自动续），
+/// 只有取消与超限才清。
+///
+/// 地址是 CDN 签发的短期凭据：长下载中途过期会在这里报错，由调用方重新
+/// 解一条新鲜地址、再带同一个文件重进即可（函数本身不关心地址从哪来）。
+pub async fn download_stream(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &[(&str, &str)],
+    deadline: Deadline,
+    max_bytes: u64,
+    path: &std::path::Path,
+    mut on_progress: impl FnMut(u64, Option<u64>) -> DownloadFlow,
+) -> ApiResult<(u64, Option<u64>, bool)> {
+    use futures_util::StreamExt;
+    use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+
+    let headers = headers
+        .iter()
+        .map(|(name, value)| (name.to_string(), value.to_string()))
+        .collect::<Vec<_>>();
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|error| ApiError::Network(error.to_string()))?;
+    }
+    // 起点以磁盘实际大小为准，不信任调用方传的值：避免文件与记录的字节数不一致。
+    let mut offset = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
+    let mut current = url.to_string();
+    for _ in 0..netguard::MAX_HOPS {
+        let target =
+            Url::parse(&current).map_err(|_| ApiError::Input("地址格式无效".to_string()))?;
+        if netguard::check_hop(&target).is_err() {
+            return Err(ApiError::SecurityBlocked);
+        }
+        let hop = netguard::route_for(&target, false).await?;
+        let sender = netguard::client_for(&hop, client);
+        let remaining = deadline.remaining().ok_or(ApiError::Timeout)?;
+        let mut builder = sender
+            .request(reqwest::Method::GET, target.clone())
+            .timeout(remaining)
+            .headers(build_headers(&headers)?);
+        if offset > 0 {
+            builder = builder.header("Range", format!("bytes={offset}-"));
+        }
+        let response = builder.send().await.map_err(|error| {
+            if error.is_timeout() {
+                ApiError::Timeout
+            } else {
+                ApiError::from(error)
+            }
+        })?;
+        let status = response.status();
+        if status.is_redirection() {
+            let location = response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok());
+            current = match location.and_then(|value| target.join(value).ok()) {
+                Some(next) => next.to_string(),
+                None => return Err(ApiError::TooManyRedirects),
+            };
+            continue;
+        }
+        let partial = status.as_u16() == 206;
+        if !(status.is_success() || partial) {
+            return Err(ApiError::Business {
+                message: format!("下载失败（HTTP {}）", status.as_u16()),
+                code: "DOWNLOAD".to_string(),
+            });
+        }
+        // 从 Content-Range（`bytes <start>-<end>/<total>`）拿真实起点与总量；不支持
+        // Range 的服务器会返回 200 + 整段，此时 `partial=false` → 必须从头重写。
+        let content_range = response
+            .headers()
+            .get("content-range")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string);
+        let (range_total, range_start) = parse_content_range(content_range.as_deref());
+        let write_start = if partial {
+            range_start.unwrap_or(offset)
+        } else {
+            0
+        };
+        offset = write_start;
+        let total = range_total.or_else(|| {
+            response
+                .content_length()
+                .filter(|len| *len > 0)
+                .map(|len| if partial { len + offset } else { len })
+        });
+        if total.is_some_and(|value| value > max_bytes) {
+            return Err(ApiError::Business {
+                message: "文件超出允许的大小".to_string(),
+                code: "DOWNLOAD".to_string(),
+            });
+        }
+        // 打开：从头（write_start=0）截新建，续传时写权限打开再 seek 到起点。
+        let mut file = if offset == 0 {
+            tokio::fs::File::create(path)
+                .await
+                .map_err(|error| ApiError::Network(error.to_string()))?
+        } else {
+            let mut opened = tokio::fs::OpenOptions::new()
+                .write(true)
+                .open(path)
+                .await
+                .map_err(|error| ApiError::Network(error.to_string()))?;
+            opened
+                .seek(std::io::SeekFrom::Start(offset))
+                .await
+                .map_err(|error| ApiError::Network(error.to_string()))?;
+            opened
+        };
+        let mut stream = response.bytes_stream();
+        let mut done = offset;
+        while let Some(chunk) = stream.next().await {
+            // 块本身拉失败（含中途超时）：不删文件，已写部分保留，直接上报错误供上层重试续传。
+            let chunk = chunk.map_err(ApiError::from)?;
+            done += chunk.len() as u64;
+            if done > max_bytes {
+                let _ = tokio::fs::remove_file(path).await;
+                return Err(ApiError::Business {
+                    message: "文件超出允许的大小".to_string(),
+                    code: "DOWNLOAD".to_string(),
+                });
+            }
+            file.write_all(&chunk)
+                .await
+                .map_err(|error| ApiError::Network(error.to_string()))?;
+            match on_progress(done, total) {
+                DownloadFlow::Continue => {}
+                DownloadFlow::Pause => {
+                    file.flush()
+                        .await
+                        .map_err(|error| ApiError::Network(error.to_string()))?;
+                    drop(file);
+                    return Ok((done, total, false));
+                }
+                DownloadFlow::Cancel => {
+                    drop(file);
+                    let _ = tokio::fs::remove_file(path).await;
+                    return Err(ApiError::Business {
+                        code: "CANCEL".to_string(),
+                        message: "已取消下载".to_string(),
+                    });
+                }
+            }
+        }
+        file.flush()
+            .await
+            .map_err(|error| ApiError::Network(error.to_string()))?;
+        drop(file);
+        return Ok((done, total, true));
+    }
+    Err(ApiError::TooManyRedirects)
+}
+
+/// `bytes 500-1000/1234` → `(Some(1234), Some(500))`；拿不到就回 `None`，不报错。
+fn parse_content_range(value: Option<&str>) -> (Option<u64>, Option<u64>) {
+    let Some(text) = value else {
+        return (None, None);
+    };
+    let (span, total) = match text.split_once('/') {
+        Some(parts) => parts,
+        None => return (None, None),
+    };
+    let total = total.trim().parse::<u64>().ok();
+    let start = span
+        .trim()
+        .strip_prefix("bytes")
+        .unwrap_or(span)
+        .trim()
+        .split('-')
+        .next()
+        .and_then(|head| head.trim().parse::<u64>().ok());
+    (total, start)
+}
+
 fn build_headers(headers: &[(String, String)]) -> Result<HeaderMap, TransportError> {
     let mut map = HeaderMap::new();
     for (name, value) in headers {

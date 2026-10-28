@@ -46,6 +46,7 @@ tauri-plugin-deep-link = "2"
 rust-ini = "=0.21.1"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "io-util", "process"] }
