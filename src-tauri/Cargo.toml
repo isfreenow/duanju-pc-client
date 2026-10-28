@@ -40,6 +40,10 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tauri-plugin-single-instance = "2.5.4"
 tauri-plugin-deep-link = "2"
+# 上游 semver 破坏：rust-ini 0.21.3 给 ParseOption 加了新字段，deep-link 2.6.2
+# 在 Linux 分支用结构体字面量初始化直接编译失败；上游修复发版后移除钉住。
+# 0.21.2 被作者 yank，只能钉 0.21.1。
+rust-ini = "=0.21.1"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
