@@ -11,7 +11,11 @@
 use hongguo_desktop_client_lib::api::{self, app_video, web};
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join(" ")
+    bytes
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn fourcc(bytes: &[u8]) -> String {
@@ -63,10 +67,12 @@ fn next(bytes: &[u8], at: usize, limit: usize) -> Option<Mp4Box> {
     })
 }
 
-const CONTAINERS: &[&str] = &["moov", "trak", "mdia", "minf", "stbl", "edts", "udta", "sinf", "schi", "mvex", "mfra"];
+const CONTAINERS: &[&str] = &[
+    "moov", "trak", "mdia", "minf", "stbl", "edts", "udta", "sinf", "schi", "mvex", "mfra",
+];
 const LEAVES: &[&str] = &[
-    "stsd", "stsz", "stco", "co64", "stsc", "stts", "tenc", "senc", "schm", "frma", "keyg", "kagr", "pssh", "btrt",
-    "hvcC", "avcC",
+    "stsd", "stsz", "stco", "co64", "stsc", "stts", "tenc", "senc", "schm", "frma", "keyg", "kagr",
+    "pssh", "btrt", "hvcC", "avcC",
 ];
 
 fn walk(bytes: &[u8], path: &str, at: usize, limit: usize, depth: usize, lines: &mut Vec<String>) {
@@ -88,15 +94,29 @@ fn walk(bytes: &[u8], path: &str, at: usize, limit: usize, depth: usize, lines: 
             let mut entry = box_.body + 8;
             while let Some(sample) = next(bytes, entry, box_.end) {
                 let name = format!("{here}/{}", sample.kind);
-                lines.push(format!("{name}[{}] {}", sample.end - entry, hex(&bytes[entry..entry + 16])));
-                lines.push(format!("{name}/tail {}", hex(&bytes[(sample.body + 60).min(sample.end)..sample.end])));
+                lines.push(format!(
+                    "{name}[{}] {}",
+                    sample.end - entry,
+                    hex(&bytes[entry..entry + 16])
+                ));
+                lines.push(format!(
+                    "{name}/tail {}",
+                    hex(&bytes[(sample.body + 60).min(sample.end)..sample.end])
+                ));
                 // A visual sample entry carries 74 fixed bytes before its children
                 // (sinf/hvcC/btrt…), an audio one only 8.
                 let fixed = match sample.kind.as_str() {
                     "encv" | "hvc1" | "hev1" | "avc1" | "avc3" | "vpc1" | "resv" => 74,
                     _ => 8,
                 };
-                walk(bytes, &name, sample.body + fixed, sample.end, depth + 1, lines);
+                walk(
+                    bytes,
+                    &name,
+                    sample.body + fixed,
+                    sample.end,
+                    depth + 1,
+                    lines,
+                );
                 entry = sample.end;
             }
         }
@@ -108,10 +128,16 @@ fn walk(bytes: &[u8], path: &str, at: usize, limit: usize, depth: usize, lines: 
 #[ignore = "downloads a whole episode (~27 MB) from the media CDN"]
 async fn measure_container_and_encryption() {
     let client = api::build_client().expect("client");
-    let catalog = web::browse_list(&client, "hot-drama", "", 1, true).await.expect("榜单");
+    let catalog = web::browse_list(&client, "hot-drama", "", 1, true)
+        .await
+        .expect("榜单");
     let card = &catalog.results[0];
-    let list = web::fetch_episode_list(&client, &card.series_id).await.expect("分集");
-    let variants = app_video::fetch_app_play_url(&client, &list.episodes[0].vid).await.expect("片源");
+    let list = web::fetch_episode_list(&client, &card.series_id)
+        .await
+        .expect("分集");
+    let variants = app_video::fetch_app_play_url(&client, &list.episodes[0].vid)
+        .await
+        .expect("片源");
     let variant = variants
         .iter()
         .find(|row| row.quality == "1080p")
@@ -141,7 +167,10 @@ async fn measure_container_and_encryption() {
 
     if let Some(at) = body.windows(8).position(|window| &window[4..8] == b"mdat") {
         let head = at + 8;
-        println!("mdat 数据起点={head}，前 64 字节：{}", hex(&body[head..head + 64]));
+        println!(
+            "mdat 数据起点={head}，前 64 字节：{}",
+            hex(&body[head..head + 64])
+        );
     }
 
     // `HG_FIXTURE=<path>` keeps one whole episode out of band so the browser-side
@@ -151,6 +180,9 @@ async fn measure_container_and_encryption() {
         if let Some(key) = variant.content_key.as_deref() {
             std::fs::write(format!("{path}.keyhex"), key).expect("写入样本密钥");
         }
-        println!("样本已存到 {path}（{} 字节），密钥同目录 .keyhex", body.len());
+        println!(
+            "样本已存到 {path}（{} 字节），密钥同目录 .keyhex",
+            body.len()
+        );
     }
 }

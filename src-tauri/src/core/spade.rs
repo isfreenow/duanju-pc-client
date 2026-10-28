@@ -9,7 +9,7 @@
 //! decrypted URL stay inside Rust and are consumed by the playback protocol.
 
 use aes::Aes128;
-use cbc::cipher::{block_padding::NoPadding, BlockDecryptMut, KeyIvInit};
+use cbc::cipher::{BlockDecryptMut, KeyIvInit, block_padding::NoPadding};
 use sha2::{Digest, Sha512};
 
 use super::bits::popcount;
@@ -135,4 +135,3 @@ pub fn decrypt_spade_url(value: &str, seed: &[u8]) -> Result<String, String> {
     }
     Ok(String::from_utf8_lossy(&plaintext).to_string())
 }
-

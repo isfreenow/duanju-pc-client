@@ -40,12 +40,16 @@ export function BrowseView({
   onPick: (card: SeriesCard) => void;
   onPlay: (episode: Episode, resumeAt?: number) => void;
 }) {
-  const state = useAsync(() => browseList(category, genre, page), [category, genre, page, refresh]);
+  const state = useAsync(() => browseList(category, genre, page), [category, genre, page, refresh], {
+    cacheKey: `browse:${category}:${genre}:${page}`,
+    keepStale: true,
+  });
   const recent = useAsync(() => listHistory(category), [category, refresh]);
   const data = state.data;
 
   if (state.loading && data === null) return <Skeleton cards={12} rows={2} />;
-  if (state.error !== null) {
+  // 失败但屏幕上有旧片单（keepStale）：继续画旧数据，不让一次刷新失败把整页抹掉。
+  if (state.error !== null && data === null) {
     return (
       <>
         <Status tone="error">

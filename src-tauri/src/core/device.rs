@@ -21,13 +21,11 @@ use base64::Engine;
 use super::f13::branch_of;
 use super::gorgon::x_gorgon;
 use super::helios::helios;
-use super::medusa::{build_medusa, md5_hex_upper, SignIdentity};
+use super::medusa::{SignIdentity, build_medusa, md5_hex_upper};
 use super::query::python_url_encode;
 use super::rand::SignRng;
 use super::register::RegisteredDevice;
-use super::tables::{
-    DEVICE_DEFAULT, SEARCH_API, VIDEO_API, VIDEO_UA, PLAYBACK_UA, SEARCH_UA,
-};
+use super::tables::{DEVICE_DEFAULT, PLAYBACK_UA, SEARCH_API, SEARCH_UA, VIDEO_API, VIDEO_UA};
 
 /// A fully signed request, ready for the transport layer to send.
 pub struct SignedRequest {
@@ -56,7 +54,11 @@ pub struct SearchCursor {
 /// `base` device fields, with the search profile's version overrides applied in
 /// place. Spreading an object in JS keeps the original key order, so overrides
 /// replace the value without moving the key to the end.
-fn device_values(overrides: &[(&'static str, &str)], iid: &str, device_id: &str) -> Vec<(&'static str, String)> {
+fn device_values(
+    overrides: &[(&'static str, &str)],
+    iid: &str,
+    device_id: &str,
+) -> Vec<(&'static str, String)> {
     let mut values = Vec::with_capacity(DEVICE_DEFAULT.len() + 2);
     for (key, default) in DEVICE_DEFAULT {
         let value = overrides
@@ -107,7 +109,10 @@ pub fn playback_request(payload: &[u8], device: &RegisteredDevice, now_ms: i64) 
                 "Accept".to_string(),
                 "application/json; charset=utf-8,application/x-protobuf".to_string(),
             ),
-            ("Content-Type".to_string(), "application/json; charset=UTF-8".to_string()),
+            (
+                "Content-Type".to_string(),
+                "application/json; charset=UTF-8".to_string(),
+            ),
         ],
         body: Some(payload.to_vec()),
     }
@@ -162,15 +167,24 @@ pub fn signed_video_request(
             "Accept".to_string(),
             "application/json; charset=utf-8,application/x-protobuf".to_string(),
         ),
-        ("Content-Type".to_string(), "application/json; charset=UTF-8".to_string()),
+        (
+            "Content-Type".to_string(),
+            "application/json; charset=UTF-8".to_string(),
+        ),
         ("x-xs-from-web".to_string(), "0".to_string()),
         ("x-ss-req-ticket".to_string(), ticket.to_string()),
         ("x-tt-request-tag".to_string(), "t=0;n=0".to_string()),
         ("sdk-version".to_string(), "2".to_string()),
         ("passport-sdk-version".to_string(), "50561".to_string()),
-        ("x-vc-bdturing-sdk-version".to_string(), "3.7.2.cn".to_string()),
+        (
+            "x-vc-bdturing-sdk-version".to_string(),
+            "3.7.2.cn".to_string(),
+        ),
         ("x-ss-stub".to_string(), md5_hex_upper(&body)),
-        ("x-gorgon".to_string(), x_gorgon(&query, Some(&body), khronos, random)),
+        (
+            "x-gorgon".to_string(),
+            x_gorgon(&query, Some(&body), khronos, random),
+        ),
         ("x-khronos".to_string(), khronos.to_string()),
         ("x-ladon".to_string(), ladon(khronos)),
         ("x-argus".to_string(), argus(khronos)),
@@ -191,7 +205,11 @@ pub fn signed_video_request(
         ("x-tt-dt".to_string(), String::new()),
     ];
 
-    SignedRequest { url, headers, body: Some(body) }
+    SignedRequest {
+        url,
+        headers,
+        body: Some(body),
+    }
 }
 
 /// `signedSearchRequest({ keyword, page, cursor })`.
@@ -230,7 +248,11 @@ pub fn signed_search_request(
     base.push(("use_correct", "true".to_string()));
     base.push(("user_is_login", "0".to_string()));
     if let Some(cursor) = cursor {
-        if let Some(search_id) = cursor.search_id.as_deref().filter(|value| !value.is_empty()) {
+        if let Some(search_id) = cursor
+            .search_id
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
             base.push(("search_id", search_id.to_string()));
         }
         if let Some(passback) = cursor.passback.as_deref().filter(|value| !value.is_empty()) {
@@ -282,7 +304,10 @@ pub fn signed_search_request(
         ("x-khronos".to_string(), khronos.to_string()),
         ("x-ladon".to_string(), ladon(khronos)),
         ("x-argus".to_string(), argus(khronos)),
-        ("x-gorgon".to_string(), x_gorgon(&query, None, khronos, random)),
+        (
+            "x-gorgon".to_string(),
+            x_gorgon(&query, None, khronos, random),
+        ),
         ("x-helios".to_string(), helios(khronos, rng)),
         (
             "x-medusa".to_string(),
@@ -300,7 +325,11 @@ pub fn signed_search_request(
         ("x-tt-dt".to_string(), String::new()),
     ];
 
-    Ok(SignedRequest { url, headers, body: None })
+    Ok(SignedRequest {
+        url,
+        headers,
+        body: None,
+    })
 }
 
 /// Read `version_name` back out of an assembled value list.

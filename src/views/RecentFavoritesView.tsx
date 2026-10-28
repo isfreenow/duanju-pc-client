@@ -8,19 +8,24 @@
  *
  * 卡片与普通剧集卡同款，封面上只标「看到第几集 / 完播 / 收藏」；点卡片进详情页，
  * 续播由详情页的「继续播放 / 再看一遍」按钮承接，列表里不再摆播放动作；
- * 收藏卡右上角有个 ✕，在本页就能直接取消收藏：卡片当场缩小消失，右下角同步
- * 给一条提示，存失败再把原样端回来并说明。✕ 自己也有按下缩小与悬停变红的反馈。
+ * 收藏卡和历史卡右上角都有个 ✕（悬停卡片才显形），在本页就能直接取消收藏 /
+ * 删除记录：卡片当场缩小消失，右下角同步给一条提示，存失败再把原样端回来并
+ * 说明。✕ 自己也有按下缩小与悬停变红的反馈。
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+    acknowledgeSeries,
+    checkUpdates,
     clearHistory,
     listFavorites,
     listHistory,
+    removeHistory,
     toggleFavorite,
     type FavoriteEntry,
     type ProgressRow,
+    type UpdateSummary,
 } from "../ipc/client";
 import { Cover, Skeleton, Status } from "../components/Cards";
 import { setFavoriteId } from "../favorites";
@@ -29,6 +34,9 @@ import { useAsync } from "../hooks/useAsync";
 
 /** 折叠态只摆这么多收藏，剩下的点「查看全部」展开。 */
 const FAVORITES_PREVIEW = 12;
+
+/** 每轮追剧检测最多查几部，和 Rust 侧 MAX_BATCH_CHECKS 一致，多余的静默留给下一轮。 */
+const CHECK_BATCH = 20;
 
 /** 相对时间：列表里「昨天看过」比一串时间戳有用。 */
 function ago(updatedAt: number): string {
@@ -56,11 +64,17 @@ export function RecentFavoritesView({
     const [showAllFavorites, setShowAllFavorites] = useState(false);
     // 取消收藏即时生效在本地列表上，不等两个 IPC 往返。
     const [favRows, setFavRows] = useState<FavoriteEntry[] | null>(null);
+    // 删除历史同理：先本地隐掉，存失败再放回。
+    const [hiddenHist, setHiddenHist] = useState<Set<string>>(() => new Set());
+    // 追剧检测结果（seriesId → 新集/续作数）：角标只读这里，失败就是没角标。
+    const [updates, setUpdates] = useState<Map<string, UpdateSummary>>(() => new Map());
 
     const loaded = favRows ?? favorites.data ?? [];
     const favList = [...loaded].sort((a, b) => b.updatedAt - a.updatedAt);
     const seenIds = new Set(favList.map((row) => row.seriesId));
-    const watched = cleared ? [] : (history.data ?? []).filter((row) => !seenIds.has(row.seriesId));
+    const watched = cleared
+        ? []
+        : (history.data ?? []).filter((row) => !seenIds.has(row.seriesId) && !hiddenHist.has(row.seriesId));
     const shown = showAllFavorites || favList.length <= FAVORITES_PREVIEW
         ? favList
         : favList.slice(0, FAVORITES_PREVIEW);
@@ -70,6 +84,53 @@ export function RecentFavoritesView({
         setCleared(false);
         history.retry();
         favorites.retry();
+    };
+
+    // 本地列表到位后静默刷一轮追剧检测：24h 内的命中 Rust 侧缓存、不走网络，
+    // 所以真正发请求的只有首次和过期那几部；单部失败只记 failed，不弹错误。
+    const favIds = favList.map((row) => row.seriesId);
+    const histIds = watched.map((row) => row.seriesId);
+    useEffect(() => {
+        const ids = [...new Set([...favIds, ...histIds])].slice(0, CHECK_BATCH);
+        if (ids.length === 0) {
+            setUpdates(new Map());
+            return;
+        }
+        let alive = true;
+        checkUpdates(ids)
+            .then((rows) => {
+                if (alive) setUpdates(new Map(rows.map((row) => [row.seriesId, row])));
+            })
+            .catch(() => undefined);
+        return () => {
+            alive = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [favIds.join("|"), histIds.join("|"), refresh]);
+
+    // 点卡片进详情就算「看过了」：把这部剧的角标就地清掉，存失败也不回头——
+    // 角标只是提示，宁可少画一次也不把已发生的动作撤回。
+    const acknowledge = (seriesId: string) => {
+        setUpdates((prev) => {
+            const hit = prev.get(seriesId);
+            if (hit === undefined || (hit.newEpisodes === 0 && hit.sequels === 0)) return prev;
+            const next = new Map(prev);
+            next.set(seriesId, { ...hit, newEpisodes: 0, acknowledgedTotal: hit.knownTotal });
+            return next;
+        });
+        void acknowledgeSeries(seriesId).catch(() => undefined);
+    };
+
+    // 封面左上角的追剧提示：新集数优先，续作候选另起一行；没有就都不画。
+    const updateBadges = (seriesId: string) => {
+        const hit = updates.get(seriesId);
+        if (hit === undefined) return null;
+        return (
+            <>
+                {hit.newEpisodes > 0 && <span className="badge update">{`新增 ${hit.newEpisodes} 集`}</span>}
+                {hit.sequels > 0 && <span className="badge sequel">{`续作 ${hit.sequels} 部`}</span>}
+            </>
+        );
     };
 
     const removeFavorite = async (seriesId: string) => {
@@ -92,6 +153,21 @@ export function RecentFavoritesView({
             setFavRows(rows);
             setFavoriteId(seriesId, rows.some((row) => row.seriesId === seriesId));
             toast("取消没存上，已回到原样");
+        }
+    };
+
+    const removeWatched = async (row: ProgressRow) => {
+        setHiddenHist((prev) => new Set(prev).add(row.seriesId));
+        toast(`已删除《${row.seriesTitle}》的观看记录`);
+        try {
+            await removeHistory(row.seriesId);
+        } catch {
+            setHiddenHist((prev) => {
+                const next = new Set(prev);
+                next.delete(row.seriesId);
+                return next;
+            });
+            toast("删除没存上，已回到原样");
         }
     };
 
@@ -155,9 +231,17 @@ export function RecentFavoritesView({
                     <h3>最近收藏</h3>
                     <div className="grid">
                         {shown.map((row) => (
-                            <button key={`fav-${row.seriesId}`} type="button" className="card" onClick={() => onPick(row.seriesId)}>
+                            <button
+                                key={`fav-${row.seriesId}`}
+                                type="button"
+                                className="card"
+                                onClick={() => {
+                                    acknowledge(row.seriesId);
+                                    onPick(row.seriesId);
+                                }}
+                            >
                                 <span
-                                    className="fav-remove"
+                                    className="card-remove"
                                     role="button"
                                     aria-label={`取消收藏 ${row.seriesTitle}`}
                                     title="取消收藏"
@@ -170,6 +254,7 @@ export function RecentFavoritesView({
                                 </span>
                                 <Cover src={row.cover} alt={row.seriesTitle} title={row.seriesTitle}>
                                     <span className="badge count">已收藏</span>
+                                    {updateBadges(row.seriesId)}
                                 </Cover>
                                 <span className="card-body">
                                     <span className="title">{row.seriesTitle}</span>
@@ -192,9 +277,30 @@ export function RecentFavoritesView({
                         {favList.length > 0 && <h3>最近观看</h3>}
                         <div className="grid history-grid">
                             {watched.map((row: ProgressRow) => (
-                                <button key={`${row.seriesId}-${row.vid}`} type="button" className="card" onClick={() => onPick(row.seriesId)}>
+                                <button
+                                    key={`${row.seriesId}-${row.vid}`}
+                                    type="button"
+                                    className="card"
+                                    onClick={() => {
+                                        acknowledge(row.seriesId);
+                                        onPick(row.seriesId);
+                                    }}
+                                >
+                                    <span
+                                        className="card-remove"
+                                        role="button"
+                                        aria-label={`删除 ${row.seriesTitle} 的观看记录`}
+                                        title="删除观看记录"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            void removeWatched(row);
+                                        }}
+                                    >
+                                        ✕
+                                    </span>
                                     <Cover src={row.cover} alt={row.seriesTitle} title={row.seriesTitle}>
                                         <span className="badge count">{row.finished ? "完播" : `看到第 ${row.vidIndex} 集`}</span>
+                                        {updateBadges(row.seriesId)}
                                     </Cover>
                                     <span className="card-body">
                                         <span className="title">{row.seriesTitle}</span>

@@ -10,6 +10,9 @@
 //!   back as a redirect is an error, exactly like the reference.
 //! * **One shared deadline per logical call**, so a slow first hop cannot make a
 //!   later hop run without a budget.
+//! * **Every hop of a redirect chain is re-checked**, and an untrusted host is
+//!   looked up before it is connected to — that part lives in [`netguard`], which
+//!   owns the address rules and the socket pools.
 
 use std::time::{Duration, Instant};
 
@@ -21,6 +24,8 @@ use url::Url;
 pub mod app_search;
 pub mod app_video;
 pub mod hema;
+pub mod netguard;
+pub mod rank;
 pub mod router;
 pub mod web;
 pub mod xifan;
@@ -54,6 +59,9 @@ pub enum ApiError {
     SecurityBlocked,
     #[error("来源未返回有效数据")]
     InvalidResponse,
+    /// 逐跳校验过了，但重定向链没有尽头。
+    #[error("来源跳转次数过多，已停止请求")]
+    TooManyRedirects,
     #[error("{message}")]
     Business { message: String, code: String },
 }
@@ -69,7 +77,32 @@ impl ApiError {
             ApiError::Timeout => "ETIMEDOUT".to_string(),
             ApiError::SecurityBlocked => "SECURITY_BLOCKED".to_string(),
             ApiError::InvalidResponse => "INVALID_RESPONSE".to_string(),
+            ApiError::TooManyRedirects => "REDIRECT_LOOP".to_string(),
             ApiError::Business { code, .. } => code.clone(),
+        }
+    }
+
+    /// 「下一步做什么」。失败信息只有一句「播放出错」时，用户能做的只有重试；
+    /// 这一字段把「换一条清晰度」「稍后再试」「到别的页签找」这类动作随错误一起
+    /// 交出去。只在少数几类错误上有定制说法，其余走默认文案。
+    pub fn recovery_hint(&self) -> Option<&'static str> {
+        match self {
+            ApiError::Timeout => Some("如果一直这样，检查一下网络，或稍后再试一次。"),
+            ApiError::Network(_) => Some("网络不通时只影响取数据，已经看过的进度不会丢。"),
+            ApiError::SecurityBlocked => {
+                Some("这条片源指向了不被支持的地址，换一条清晰度或稍后再试。")
+            }
+            ApiError::InvalidResponse => Some("来源页面结构可能变了；稍后重试，仍不行请反馈。"),
+            ApiError::TooManyRedirects => Some("来源跳转异常，稍后重试或换一条片源。"),
+            ApiError::Business { code, .. } => match code.as_str() {
+                "SOURCE" => Some("来源暂时不可用，稍后重试会自动换一个片源。"),
+                "NO_PLAYABLE_SOURCE" => Some("换一集或稍后再试；本集没有可播的片源。"),
+                "SEARCH_UPSTREAM" => Some("稍后重试；搜索服务暂时不可用，与本地设置无关。"),
+                "SEARCH_FORMAT" => Some("搜索接口变了，需要新版本适配；可先到首页类目浏览。"),
+                "APP_EMPTY" | "APP_BUSINESS" => Some("已自动改走官网数据；若结果不全，稍后重试。"),
+                _ => None,
+            },
+            ApiError::Input(_) => None,
         }
     }
 }
@@ -120,6 +153,134 @@ impl Deadline {
     }
 }
 
+/// 一条请求走哪套地址规则。把「控制面」与「数据面」分开说，是因为它们的风险
+/// 完全不同：API 主机名是本模块里写死的常量，已经过了域名白名单；站点与片源
+/// 主机名来自响应内容，必须由 [`netguard`] 再看一眼实际地址。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FetchKind {
+    /// 签名接口主机（域名白名单已把住），不做 IP 校验。
+    Api,
+    /// 站点页面与站点接口：逐跳验地址，官网那一跳优先可信 DNS（DoH 钉地址）。
+    Site,
+    /// 与 `Site` 同一逐跳地址规则，但**强制走普通系统解析**（不优先可信 DNS）。
+    /// 分集页双路线竞速用它做「DoH 端点被墙时仍能出片单」的那条退路。
+    SitePlain,
+    /// 片源地址：逐跳验地址，普通 DNS。
+    Media,
+}
+
+/// 传输层的中间错误，由调用方按自己的语义翻成 `ApiError`（同一个 HTTP 429 在
+/// 签名接口上是业务错误，在站点页面上是「来源不可用」）。
+enum TransportError {
+    Status(u16),
+    Failure(ApiError),
+    TooManyRedirections,
+}
+
+impl From<TransportError> for ApiError {
+    fn from(error: TransportError) -> Self {
+        match error {
+            TransportError::Failure(error) => error,
+            TransportError::TooManyRedirections => ApiError::TooManyRedirects,
+            TransportError::Status(_) => ApiError::InvalidResponse,
+        }
+    }
+}
+
+impl From<ApiError> for TransportError {
+    fn from(error: ApiError) -> Self {
+        TransportError::Failure(error)
+    }
+}
+
+/// 单一传输入口：逐跳重读 URL、逐跳过地址规则、每一跳都重新查剩余预算。
+///
+/// 重定向一律手工跟（`Policy::none`），因为签名过的请求体不能被重放到另一个
+/// 主机上；`domains` 非空时每一跳还要求主机落在白名单里。`kind` 决定是否需要
+/// 在连接前先解析并校验地址（钉到公网地址）。
+async fn transport(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &[(String, String)],
+    body: Option<&[u8]>,
+    domains: &[&str],
+    deadline: Deadline,
+    kind: FetchKind,
+) -> Result<Vec<u8>, TransportError> {
+    let method = if body.is_some() {
+        reqwest::Method::POST
+    } else {
+        reqwest::Method::GET
+    };
+    let mut current = url.to_string();
+    for _ in 0..netguard::MAX_HOPS {
+        let target =
+            Url::parse(&current).map_err(|_| ApiError::Input("地址格式无效".to_string()))?;
+        if !domains.is_empty() {
+            if checked_url(&current, domains).is_err() {
+                return Err(TransportError::Failure(ApiError::SecurityBlocked));
+            }
+        } else if netguard::check_hop(&target).is_err() {
+            return Err(TransportError::Failure(ApiError::SecurityBlocked));
+        }
+        let trusted = match kind {
+            FetchKind::Api => true,
+            FetchKind::Site => target.host_str() == Some(netguard::OFFICIAL_HOST),
+            FetchKind::SitePlain | FetchKind::Media => false,
+        };
+        let hop = match kind {
+            FetchKind::Api => netguard::Route::Direct,
+            _ => netguard::route_for(&target, trusted)
+                .await
+                .map_err(TransportError::Failure)?,
+        };
+        let sender = netguard::client_for(&hop, client);
+        let remaining = match deadline.remaining() {
+            Some(remaining) => remaining,
+            None => return Err(TransportError::Failure(ApiError::Timeout)),
+        };
+        let mut builder = sender
+            .request(method.clone(), target.clone())
+            .timeout(remaining)
+            .headers(build_headers(headers)?);
+        if let Some(payload) = body {
+            builder = builder.body(payload.to_vec());
+        }
+        let response = builder.send().await.map_err(|error| {
+            TransportError::Failure(if error.is_timeout() {
+                ApiError::Timeout
+            } else {
+                ApiError::Network(error.to_string())
+            })
+        })?;
+        let status = response.status();
+        if status.is_redirection() {
+            // 签名请求体绝不重放到重定向目标上，这一点与参考实现一致。
+            let location = response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok());
+            if body.is_some() || location.is_none() {
+                return Err(TransportError::Failure(ApiError::SecurityBlocked));
+            }
+            current = match target.join(location.unwrap_or_default()) {
+                Ok(next) => next.to_string(),
+                Err(_) => return Err(TransportError::Failure(ApiError::SecurityBlocked)),
+            };
+            continue;
+        }
+        if !status.is_success() {
+            return Err(TransportError::Status(status.as_u16()));
+        }
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|error| TransportError::Failure(error.into()))?;
+        return Ok(bytes.to_vec());
+    }
+    Err(TransportError::TooManyRedirections)
+}
+
 /// `requestJson` for GET/POST against the signed API hosts.
 ///
 /// `body` is only ever sent to the original URL; a redirect on a POST is refused.
@@ -129,61 +290,38 @@ pub async fn request_json(
     headers: &[(String, String)],
     body: Option<&[u8]>,
     domains: &[&str],
-    deadline: Deadline
+    deadline: Deadline,
 ) -> ApiResult<serde_json::Value> {
-    let mut current = checked_url(url, domains)?.as_str().to_string();
-    for _ in 0..4 {
-        let target = checked_url(&current, domains)?;
-        let remaining = deadline.remaining().ok_or(ApiError::Timeout)?;
-        let method = if body.is_some() { reqwest::Method::POST } else { reqwest::Method::GET };
-        let mut builder = client
-            .request(method, target.clone())
-            .timeout(remaining)
-            .headers(build_headers(headers)?);
-        if let Some(payload) = body {
-            builder = builder.body(payload.to_vec());
-        }
-        let response = builder.send().await.map_err(|error| {
-            if error.is_timeout() {
-                ApiError::Timeout
-            } else {
-                ApiError::Network("网络请求失败，请稍后重试".to_string())
-            }
-        })?;
-        let status = response.status();
-        if status.is_redirection() {
-            // Do not resend a signed body to a redirect destination.
-            let location = response.headers().get("location").and_then(|v| v.to_str().ok());
-            if body.is_some() || location.is_none() {
-                return Err(ApiError::SecurityBlocked);
-            }
-            current = target
-                .join(location.unwrap_or_default())
-                .map_err(|_| ApiError::SecurityBlocked)?
-                .to_string();
-            continue;
-        }
-        if status.as_u16() != 200 {
-            return Err(ApiError::Business {
-                message: format!("请求失败（HTTP {}）", status.as_u16()),
-                code: "HTTP".to_string(),
-            });
-        }
-        let bytes = response.bytes().await?;
-        if bytes.is_empty() {
-            return Err(ApiError::Business {
-                message: "接口返回空响应".to_string(),
-                code: "APP_EMPTY".to_string(),
-            });
-        }
-        let parsed: serde_json::Value = serde_json::from_slice(&bytes)
-            .map_err(|_| ApiError::InvalidResponse)?;
-        if !parsed.is_object() {
-            return Err(ApiError::InvalidResponse);
-        }
-        return Ok(parsed);
+    let bytes = match transport(
+        client,
+        url,
+        headers,
+        body,
+        domains,
+        deadline,
+        FetchKind::Api,
+    )
+    .await
+    {
+        Ok(bytes) => bytes,
+        Err(TransportError::Status(code)) => Err(ApiError::Business {
+            message: format!("请求失败（HTTP {code}）"),
+            code: "HTTP".to_string(),
+        })?,
+        Err(other) => Err(ApiError::from(other))?,
+    };
+    if bytes.is_empty() {
+        return Err(ApiError::Business {
+            message: "接口返回空响应".to_string(),
+            code: "APP_EMPTY".to_string(),
+        });
     }
-    Err(ApiError::SecurityBlocked)
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| ApiError::InvalidResponse)?;
+    if !parsed.is_object() {
+        return Err(ApiError::InvalidResponse);
+    }
+    Ok(parsed)
 }
 
 /// Plain text fetch for the website pages (no domain allowlist: the site origin
@@ -192,46 +330,150 @@ pub async fn fetch_text(
     client: &reqwest::Client,
     url: &str,
     headers: &[(&str, &str)],
+    kind: FetchKind,
     deadline: Deadline,
     max_bytes: usize,
 ) -> ApiResult<String> {
-    let remaining = deadline.remaining().ok_or(ApiError::Timeout)?;
-    let mut builder = client.get(url).timeout(remaining);
-    for (name, value) in headers {
-        builder = builder.header(*name, *value);
-    }
-    let response = builder.send().await.map_err(|error| {
-        if error.is_timeout() {
-            ApiError::Timeout
-        } else {
-            ApiError::Network("来源连接失败，请稍后重试".to_string())
-        }
-    })?;
-    let status = response.status();
-    if status.as_u16() == 429 || status.is_server_error() {
-        return Err(ApiError::Business {
-            message: format!("来源暂不可用（HTTP {}）", status.as_u16()),
+    let headers = headers
+        .iter()
+        .map(|(name, value)| (name.to_string(), value.to_string()))
+        .collect::<Vec<_>>();
+    let bytes = match transport(client, url, &headers, None, &[], deadline, kind).await {
+        Ok(bytes) => bytes,
+        Err(TransportError::Status(code)) => Err(ApiError::Business {
+            message: if code == 429 || code >= 500 {
+                format!("来源暂不可用（HTTP {code}）")
+            } else {
+                format!("来源请求失败（HTTP {code}）")
+            },
             code: "SOURCE".to_string(),
-        });
-    }
-    if !status.is_success() {
-        return Err(ApiError::Business {
-            message: format!("来源请求失败（HTTP {}）", status.as_u16()),
-            code: "SOURCE".to_string(),
-        });
-    }
-    let bytes = response.bytes().await?;
+        })?,
+        Err(other) => Err(ApiError::from(other))?,
+    };
     if bytes.len() > max_bytes {
         return Err(ApiError::Input("来源页面过大，请稍后重试".to_string()));
     }
     Ok(String::from_utf8_lossy(&bytes).to_string())
 }
 
-fn build_headers(headers: &[(String, String)]) -> ApiResult<HeaderMap> {
+/// 同一个传输入口的二进制版本：片源下载与按需拉取的转码工具都走它，因此同样
+/// 逐跳过 SSRF 规则，并且只用普通系统解析（数据面的主机名来自响应，不给它
+/// 优先走可信 DNS 的理由）。
+///
+/// 与 [`fetch_text`] 的区别只在出口：这里落盘而不是转字符串，并且把每一块的进
+/// 度回报给调用方（命令层把它变成前端事件）。`max_bytes` 是硬上限，宁可失败也
+/// 不把无上限的响应写满磁盘。
+pub async fn fetch_binary(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &[(&str, &str)],
+    deadline: Deadline,
+    max_bytes: u64,
+    path: &std::path::Path,
+    mut on_progress: impl FnMut(u64, Option<u64>),
+) -> ApiResult<u64> {
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let headers = headers
+        .iter()
+        .map(|(name, value)| (name.to_string(), value.to_string()))
+        .collect::<Vec<_>>();
+    // 手工重定向那一套与 `transport` 相同，但数据面不整块读进内存。
+    let mut current = url.to_string();
+    for _ in 0..netguard::MAX_HOPS {
+        let target =
+            Url::parse(&current).map_err(|_| ApiError::Input("地址格式无效".to_string()))?;
+        if netguard::check_hop(&target).is_err() {
+            return Err(ApiError::SecurityBlocked);
+        }
+        let hop = netguard::route_for(&target, false).await?;
+        let sender = netguard::client_for(&hop, client);
+        let remaining = deadline.remaining().ok_or(ApiError::Timeout)?;
+        let response = sender
+            .request(reqwest::Method::GET, target.clone())
+            .timeout(remaining)
+            .headers(build_headers(&headers)?)
+            .send()
+            .await
+            .map_err(|error| {
+                if error.is_timeout() {
+                    ApiError::Timeout
+                } else {
+                    ApiError::from(error)
+                }
+            })?;
+        let status = response.status();
+        if status.is_redirection() {
+            let location = response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok());
+            current = match location.and_then(|value| target.join(value).ok()) {
+                Some(next) => next.to_string(),
+                None => return Err(ApiError::TooManyRedirects),
+            };
+            continue;
+        }
+        if !status.is_success() {
+            return Err(ApiError::Business {
+                message: format!("下载失败（HTTP {}）", status.as_u16()),
+                code: "DOWNLOAD".to_string(),
+            });
+        }
+        let total = response.content_length().filter(|value| *value > 0);
+        if total.is_some_and(|value| value > max_bytes) {
+            return Err(ApiError::Business {
+                message: "文件超出允许的大小".to_string(),
+                code: "DOWNLOAD".to_string(),
+            });
+        }
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|error| ApiError::Network(error.to_string()))?;
+        }
+        let mut file = tokio::fs::File::create(path)
+            .await
+            .map_err(|error| ApiError::Network(error.to_string()))?;
+        let mut stream = response.bytes_stream();
+        let mut done: u64 = 0;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(ApiError::from)?;
+            done += chunk.len() as u64;
+            if done > max_bytes {
+                let _ = file.shutdown().await;
+                let _ = tokio::fs::remove_file(path).await;
+                return Err(ApiError::Business {
+                    message: "文件超出允许的大小".to_string(),
+                    code: "DOWNLOAD".to_string(),
+                });
+            }
+            file.write_all(&chunk)
+                .await
+                .map_err(|error| ApiError::Network(error.to_string()))?;
+            on_progress(done, total);
+        }
+        file.flush()
+            .await
+            .map_err(|error| ApiError::Network(error.to_string()))?;
+        drop(file);
+        return Ok(done);
+    }
+    Err(ApiError::TooManyRedirects)
+}
+
+fn build_headers(headers: &[(String, String)]) -> Result<HeaderMap, TransportError> {
     let mut map = HeaderMap::new();
     for (name, value) in headers {
-        let key = HeaderName::from_bytes(name.as_bytes()).map_err(|_| ApiError::Input("请求头名称无效".to_string()))?;
-        map.insert(key, HeaderValue::from_str(value).map_err(|_| ApiError::Input("请求头内容无效".to_string()))?);
+        let key = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| TransportError::Failure(ApiError::Input("请求头名称无效".to_string())))?;
+        map.insert(
+            key,
+            HeaderValue::from_str(value).map_err(|_| {
+                TransportError::Failure(ApiError::Input("请求头内容无效".to_string()))
+            })?,
+        );
     }
     Ok(map)
 }
@@ -436,7 +678,8 @@ pub fn is_public_media_url(value: &str) -> bool {
     if let Ok(address) = host.parse::<std::net::IpAddr>() {
         return is_public_address(&address);
     }
-    host.contains('.') && !host.ends_with(".localhost")
+    host.contains('.')
+        && !host.ends_with(".localhost")
         && !host.ends_with(".local")
         && !host.ends_with(".internal")
         && !host.ends_with(".lan")
@@ -488,11 +731,17 @@ fn v4_blocked(value: u32) -> bool {
         (0xcb00_7100, 24),
         (0xe000_0000, 3),
     ];
-    RANGES.iter().any(|(base, prefix)| v4_prefix(value, *base, *prefix))
+    RANGES
+        .iter()
+        .any(|(base, prefix)| v4_prefix(value, *base, *prefix))
 }
 
 fn v4_prefix(value: u32, base: u32, prefix: u8) -> bool {
-    let mask = if prefix == 0 { 0 } else { u32::MAX << (32 - prefix as u32) };
+    let mask = if prefix == 0 {
+        0
+    } else {
+        u32::MAX << (32 - prefix as u32)
+    };
     value & mask == base & mask
 }
 

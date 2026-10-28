@@ -27,6 +27,8 @@ pub mod sm3;
 pub mod spade;
 pub mod tables;
 
-pub use device::{playback_request, signed_search_request, signed_video_request, SearchCursor, SignedRequest};
+pub use device::{
+    SearchCursor, SignedRequest, playback_request, signed_search_request, signed_video_request,
+};
 pub use rand::SignRng;
-pub use register::{playback_device, RegisteredDevice};
+pub use register::{RegisteredDevice, playback_device};

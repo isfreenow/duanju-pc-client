@@ -8,7 +8,7 @@
 
 use md5::{Digest, Md5};
 
-use super::bits::{bxor, le32, read_le32, ror32, rol32};
+use super::bits::{bxor, le32, read_le32, rol32, ror32};
 use super::sm3::sm3;
 use super::tables::{
     BRANCH0_PAD_SEED, BRANCH2_N1, BRANCH2_ORDERS, BRANCH2_PAD_SEED, BRANCH2_SV, F13_CHOSEN,
@@ -78,24 +78,33 @@ fn branch_of_iv(iv: u32) -> u32 {
     low - iv_v0 * 3
 }
 
-fn md5_v3_step(kind: u32, a: u32, b: u32, c: u32, d: u32, m: u32, shift: u32, constant: u32) -> u32 {
+fn md5_v3_step(
+    kind: u32,
+    a: u32,
+    b: u32,
+    c: u32,
+    d: u32,
+    m: u32,
+    shift: u32,
+    constant: u32,
+) -> u32 {
     let f = match kind {
         0 => (b & c) | (!b & d),
         1 => (b & d) | (c & !d),
         2 => b ^ c ^ d,
         _ => c ^ (b | !d),
     };
-    let inner = a
-        .wrapping_add(f)
-        .wrapping_add(m)
-        .wrapping_add(constant);
+    let inner = a.wrapping_add(f).wrapping_add(m).wrapping_add(constant);
     b.wrapping_add(rol32(inner as i64, shift))
 }
 
 /// `md5SumV3` — the rotated-constant MD5 variant used by Medusa branch 2.
 /// `message` must be 64 bytes (16 LE words) and `orders` 64 bytes.
 fn md5_sum_v3(message: &[u8], count_v2: u32, orders: &[u8], count_v1: u32) -> Vec<u8> {
-    let sv: Vec<u32> = BRANCH2_SV.iter().map(|v| ror32(*v as i64, count_v1)).collect();
+    let sv: Vec<u32> = BRANCH2_SV
+        .iter()
+        .map(|v| ror32(*v as i64, count_v1))
+        .collect();
     let start: [u32; 4] = [
         ror32(0x79e0_f2fb as i64, count_v2),
         ror32(0xc8b5_2570 as i64, count_v2),
@@ -147,7 +156,13 @@ fn md5_sum_v3(message: &[u8], count_v2: u32, orders: &[u8], count_v1: u32) -> Ve
 }
 
 /// Medusa branch 2.
-fn branch2_f13(iv: u32, query_sm3: &[u8], body_md5: &[u8], ts_bytes: &[u8; 4], khronos: u32) -> Vec<u8> {
+fn branch2_f13(
+    iv: u32,
+    query_sm3: &[u8],
+    body_md5: &[u8],
+    ts_bytes: &[u8; 4],
+    khronos: u32,
+) -> Vec<u8> {
     let v = (iv & 13) * 86;
     let iv_v0 = ((v >> 15) & 255) + ((v >> 8) & 255);
     let n1 = BRANCH2_N1[iv_v0 as usize];
@@ -176,7 +191,13 @@ fn branch2_f13(iv: u32, query_sm3: &[u8], body_md5: &[u8], ts_bytes: &[u8; 4], k
 }
 
 /// Medusa branch 0 — the long SHA-1-like compression the reference inlines.
-fn branch0_f13(iv: u32, query_sm3: &[u8], body_md5: &[u8], ts_bytes: &[u8; 4], khronos: u32) -> Vec<u8> {
+fn branch0_f13(
+    iv: u32,
+    query_sm3: &[u8],
+    body_md5: &[u8],
+    ts_bytes: &[u8; 4],
+    khronos: u32,
+) -> Vec<u8> {
     let low = iv & 15;
     let iv_v0 = ((low * 171) >> 9) as usize;
     let iv_v1 = IV_V1_LIST[iv_v0];
@@ -263,12 +284,7 @@ fn branch0_f13(iv: u32, query_sm3: &[u8], body_md5: &[u8], ts_bytes: &[u8; 4], k
 
 /// `hashF13(querySm3, bodyMd5, tsBytes, khronos)` — 36 or 20 bytes depending on
 /// which branch the IV lands in.
-pub fn hash_f13(
-    query_sm3: &[u8],
-    body_md5: &[u8],
-    ts_bytes: &[u8; 4],
-    khronos: u32,
-) -> Vec<u8> {
+pub fn hash_f13(query_sm3: &[u8], body_md5: &[u8], ts_bytes: &[u8; 4], khronos: u32) -> Vec<u8> {
     let iv = mix_iv(query_sm3, body_md5, ts_bytes);
     let branch = branch_of_iv(iv);
     if branch == 2 {

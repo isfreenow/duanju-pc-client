@@ -42,7 +42,9 @@ impl SignRng {
     pub fn consumed(&self) -> (usize, usize) {
         match self {
             SignRng::System => (0, 0),
-            SignRng::Replay { position, cursor, .. } => (position.get(), cursor.get()),
+            SignRng::Replay {
+                position, cursor, ..
+            } => (position.get(), cursor.get()),
         }
     }
 
@@ -50,11 +52,15 @@ impl SignRng {
     pub fn next_f64(&self) -> f64 {
         match self {
             SignRng::System => rand::thread_rng().gen_range(0.0..1.0),
-            SignRng::Replay { stream, position, .. } => {
+            SignRng::Replay {
+                stream, position, ..
+            } => {
                 let index = position.get();
                 position.set(index + 1);
                 stream.get(index).copied().unwrap_or_else(|| {
-                    panic!("replay stream exhausted at index {index} — regenerate the golden vectors")
+                    panic!(
+                        "replay stream exhausted at index {index} — regenerate the golden vectors"
+                    )
                 })
             }
         }

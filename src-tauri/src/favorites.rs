@@ -54,7 +54,10 @@ impl Store {
     }
 
     pub fn list(&self) -> Vec<FavoriteEntry> {
-        self.entries.lock().map(|guard| guard.clone()).unwrap_or_default()
+        self.entries
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_default()
     }
 
     pub fn contains(&self, series_id: &str) -> bool {
@@ -143,7 +146,9 @@ mod tests {
         }
         let rows = Store::open(&dir).list();
         assert_eq!(
-            rows.iter().map(|row| row.series_id.as_str()).collect::<Vec<_>>(),
+            rows.iter()
+                .map(|row| row.series_id.as_str())
+                .collect::<Vec<_>>(),
             vec!["b", "a"]
         );
         let _ = fs::remove_dir_all(&dir);

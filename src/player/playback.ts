@@ -75,7 +75,7 @@ async function download(url: string, onStage: StageListener): Promise<Bytes> {
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let done = 0;
-  for (;;) {
+  for (; ;) {
     const { value, done: finished } = await reader.read();
     if (finished) break;
     if (value === undefined || value.length === 0) continue;
@@ -96,12 +96,24 @@ async function download(url: string, onStage: StageListener): Promise<Bytes> {
  * Ask the decoder stack whether it can handle this codec at all. HEVC is the
  * common answer for these streams and it is not universal: hardware support is
  * what decides it, so probing beats assuming.
+ *
+ * 调试开关：localStorage 里 `duanju.sim-no-hevc=1` 时把 HEVC 一律判为不可播，
+ * 用于在有硬解的机器上演示「缺扩展」的引导与转码入口。正式使用没人写这个键。
  */
-export function   codecSupported(mime: string): boolean {
+export function codecSupported(mime: string): boolean {
   if (typeof document === "undefined") return true;
+  if (isHevcMime(mime) && typeof localStorage !== "undefined" && localStorage.getItem("duanju.sim-no-hevc") === "1") {
+    return false;
+  }
   const probe = document.createElement("video");
   const verdict = probe.canPlayType(mime);
   return verdict === "probably" || verdict === "maybe";
+}
+
+function isHevcMime(mime: string): boolean {
+  const lowered = mime.toLowerCase();
+  // 探测用的 RFC 6381 串是 hvc1 前缀（见 mimeFor），品牌标签别漏掉。
+  return lowered.includes("hev") || lowered.includes("hvc") || lowered.includes("h265") || lowered.includes("bytevc");
 }
 
 /**

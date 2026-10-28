@@ -15,17 +15,18 @@
 use std::io::Write;
 
 use aes::Aes128;
-use cbc::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
-use flate2::{write::GzEncoder, Compression};
-use serde_json::{json, Value};
+use cbc::cipher::{BlockEncryptMut, KeyIvInit, block_padding::Pkcs7};
+use flate2::{Compression, write::GzEncoder};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha512};
 
-use crate::api::{request_json, ApiError, ApiResult, API_DOMAINS, Deadline};
+use crate::api::{API_DOMAINS, ApiError, ApiResult, Deadline, request_json};
 
 use super::tables::SPADE_URL_CONSTANTS;
 
 const REGISTER_URL: &str = "https://log5-applog-lf.fqnovel.com/service/2/device_register/?tt_data=a&cronet_version=8d40f833_2026-03-03&ttnet_version=4.2.243.31-douyin&use_store_region_cookie=1";
-const REGISTER_UA: &str = "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)";
+const REGISTER_UA: &str =
+    "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)";
 const TIMEOUT_SECS: u64 = 8;
 
 type Aes128CbcEnc = cbc::Encryptor<Aes128>;
@@ -166,7 +167,8 @@ pub async fn register_device(client: &reqwest::Client) -> ApiResult<RegisteredDe
         }
     }
     let header = Value::Object(header);
-    let payload = json!({ "magic_tag": "ss_app_log", "header": header, "_gen_time": now_ms }).to_string();
+    let payload =
+        json!({ "magic_tag": "ss_app_log", "header": header, "_gen_time": now_ms }).to_string();
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder
@@ -194,11 +196,17 @@ pub async fn register_device(client: &reqwest::Client) -> ApiResult<RegisteredDe
         ("log-encode-type".to_string(), "gzip".to_string()),
         ("x-ss-dp".to_string(), "8662".to_string()),
         ("x-ss-req-ticket".to_string(), now_ms.to_string()),
-        ("x-vc-bdturing-sdk-version".to_string(), "4.0.3.cn".to_string()),
+        (
+            "x-vc-bdturing-sdk-version".to_string(),
+            "4.0.3.cn".to_string(),
+        ),
         ("lc".to_string(), "101".to_string()),
         ("sdk-version".to_string(), "2".to_string()),
         ("passport-sdk-version".to_string(), "5051452".to_string()),
-        ("x-neptune".to_string(), "-8|50:51:59:30:40:47:49:39".to_string()),
+        (
+            "x-neptune".to_string(),
+            "-8|50:51:59:30:40:47:49:39".to_string(),
+        ),
         ("x-ss-stub".to_string(), stub),
     ];
 
@@ -221,7 +229,11 @@ pub async fn register_device(client: &reqwest::Client) -> ApiResult<RegisteredDe
             code: "DEVICE_REGISTRATION_FAILED".to_string(),
         });
     }
-    Ok(RegisteredDevice { device_id, iid, cdid })
+    Ok(RegisteredDevice {
+        device_id,
+        iid,
+        cdid,
+    })
 }
 
 /// `registration ||= …` — register once per process and reuse the identity, so

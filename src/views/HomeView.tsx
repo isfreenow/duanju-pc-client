@@ -107,6 +107,7 @@ export function GenreRail({
                 ? browseList(category, genre, 1).catch(() => null)
                 : Promise.resolve(null),
         [active, category, genre, refresh],
+        { cacheKey: `browse:${category}:${genre}:1`, keepStale: true },
     );
     const page = state.data;
 
@@ -141,11 +142,16 @@ export function HomeView({
     onSeeAll: (category: string, genre: string) => void;
 }) {
     // 一次取四个类目的首页：既给「总览行」出内容，又读出各类目的题材清单。
+    // 整组请求失败（进程被挂起后醒来一类）时留旧片单，别把首页抹回骨架屏。
     const meta = useAsync(
         () => Promise.all(ROWS.map((row) => browseList(row.category, "", 1).catch(() => null))),
         [refresh],
+        { cacheKey: `home:meta:${refresh}`, keepStale: true },
     );
-    const recent = useAsync(() => listHistory(""), [refresh]);
+    const recent = useAsync(() => listHistory(""), [refresh], {
+        cacheKey: `home:recent:${refresh}`,
+        keepStale: true,
+    });
     const recentRows = useMemo(
         () => (recent.data ?? []).filter((row) => REDGUO.has(row.category)).slice(0, RECENT_LIMIT),
         [recent.data],

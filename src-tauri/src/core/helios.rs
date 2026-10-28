@@ -45,7 +45,9 @@ pub fn helios(khronos: u32, rng: &SignRng) -> String {
         x8 ^= ror64(b0, 61);
         table.push(x8);
         b0 = x8;
-        b8 = queue.pop_front().expect("queue never empties: push and shift balance");
+        b8 = queue
+            .pop_front()
+            .expect("queue never empties: push and shift balance");
     }
 
     let text = format!("{khronos}-1588093228-8662");

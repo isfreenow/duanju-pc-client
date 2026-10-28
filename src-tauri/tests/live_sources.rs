@@ -33,7 +33,10 @@ async fn hema_browse_search_episodes_and_play() {
     let client = api::build_client().expect("client");
     let mut failures: Vec<String> = Vec::new();
     let mut report = |label: &str, line: String, ok: bool| {
-        println!("{} 河马 {label}: {line}", if ok { "  ok  " } else { " FAIL " });
+        println!(
+            "{} 河马 {label}: {line}",
+            if ok { "  ok  " } else { " FAIL " }
+        );
         if !ok {
             failures.push(label.to_string());
         }
@@ -54,7 +57,13 @@ async fn hema_browse_search_episodes_and_play() {
             page.results.len(),
             page.genres.len(),
             page.page_title,
-            host_of(&page.results.first().map(|card| card.cover.clone()).unwrap_or_default())
+            host_of(
+                &page
+                    .results
+                    .first()
+                    .map(|card| card.cover.clone())
+                    .unwrap_or_default()
+            )
         ),
         !page.results.is_empty(),
     );
@@ -64,7 +73,12 @@ async fn hema_browse_search_episodes_and_play() {
         match hema::browse_list(&client, &genre.slug, 2, false).await {
             Ok(next) => report(
                 "browse_list(题材+第 2 页)",
-                format!("「{}」{} 条，第 {} 页", genre.label, next.results.len(), next.page),
+                format!(
+                    "「{}」{} 条，第 {} 页",
+                    genre.label,
+                    next.results.len(),
+                    next.page
+                ),
                 !next.results.is_empty(),
             ),
             Err(error) => report("browse_list(题材+第 2 页)", why(&error), false),
@@ -97,7 +111,12 @@ async fn hema_browse_search_episodes_and_play() {
     match hema::public_details(&client, &card.series_id).await {
         Ok(details) => report(
             "public_details",
-            format!("标签「{}」，收藏 {:?}，来源 host={}", details.metadata.episode_label, details.favorite_count, host_of(&details.source_url)),
+            format!(
+                "标签「{}」，收藏 {:?}，来源 host={}",
+                details.metadata.episode_label,
+                details.favorite_count,
+                host_of(&details.source_url)
+            ),
             true,
         ),
         Err(error) => report("public_details", why(&error), false),
@@ -129,7 +148,12 @@ async fn hema_browse_search_episodes_and_play() {
     };
     match hema::play_source(&client, &episode.vid, &list.series_id).await {
         Ok(source) => {
-            let head = match client.get(&source.url).header("Range", "bytes=0-4095").send().await {
+            let head = match client
+                .get(&source.url)
+                .header("Range", "bytes=0-4095")
+                .send()
+                .await
+            {
                 Ok(response) => {
                     let status = response.status().as_u16();
                     let length = response.bytes().await.map(|bytes| bytes.len()).unwrap_or(0);
@@ -170,7 +194,11 @@ async fn hema_browse_search_episodes_and_play() {
     let wrong = hema::play_source(&client, "1234567890", "").await;
     report(
         "play_source(非本来源编号)",
-        wrong.as_ref().err().map(|error| why(error)).unwrap_or("居然成功".to_string()),
+        wrong
+            .as_ref()
+            .err()
+            .map(|error| why(error))
+            .unwrap_or("居然成功".to_string()),
         wrong.is_err(),
     );
 
@@ -183,7 +211,10 @@ async fn xifan_browse_search_episodes_and_play() {
     let client = api::build_client().expect("client");
     let mut failures: Vec<String> = Vec::new();
     let mut report = |label: &str, line: String, ok: bool| {
-        println!("{} 西饭 {label}: {line}", if ok { "  ok  " } else { " FAIL " });
+        println!(
+            "{} 西饭 {label}: {line}",
+            if ok { "  ok  " } else { " FAIL " }
+        );
         if !ok {
             failures.push(label.to_string());
         }
@@ -204,7 +235,13 @@ async fn xifan_browse_search_episodes_and_play() {
             page.results.len(),
             page.genres.len(),
             page.page_title,
-            host_of(&page.results.first().map(|card| card.cover.clone()).unwrap_or_default())
+            host_of(
+                &page
+                    .results
+                    .first()
+                    .map(|card| card.cover.clone())
+                    .unwrap_or_default()
+            )
         ),
         !page.results.is_empty(),
     );
@@ -213,7 +250,12 @@ async fn xifan_browse_search_episodes_and_play() {
         match xifan::browse_list(&client, &genre.slug, 2, false).await {
             Ok(next) => report(
                 "browse_list(分类+第 2 页)",
-                format!("「{}」{} 条，第 {} 页", genre.label, next.results.len(), next.page),
+                format!(
+                    "「{}」{} 条，第 {} 页",
+                    genre.label,
+                    next.results.len(),
+                    next.page
+                ),
                 !next.results.is_empty(),
             ),
             Err(error) => report("browse_list(分类+第 2 页)", why(&error), false),
@@ -232,7 +274,11 @@ async fn xifan_browse_search_episodes_and_play() {
                     .first()
                     .map(|card| card.series_title.as_str())
                     .unwrap_or("?"),
-                result.results.first().map(|card| card.episode_count).unwrap_or(0)
+                result
+                    .results
+                    .first()
+                    .map(|card| card.episode_count)
+                    .unwrap_or(0)
             ),
             !result.results.is_empty(),
         ),
@@ -246,7 +292,10 @@ async fn xifan_browse_search_episodes_and_play() {
     match xifan::public_details(&client, &card.series_id).await {
         Ok(details) => report(
             "public_details",
-            format!("标签「{}」，状态 {}", details.metadata.episode_label, details.metadata.completion_status),
+            format!(
+                "标签「{}」，状态 {}",
+                details.metadata.episode_label, details.metadata.completion_status
+            ),
             true,
         ),
         Err(error) => report("public_details", why(&error), false),
@@ -297,7 +346,12 @@ async fn xifan_browse_search_episodes_and_play() {
                 })
                 .unwrap_or((0, None));
             let target = first.1.clone().unwrap_or_else(|| source.url.clone());
-            let fetched = match client.get(&target).header("Range", "bytes=0-4095").send().await {
+            let fetched = match client
+                .get(&target)
+                .header("Range", "bytes=0-4095")
+                .send()
+                .await
+            {
                 Ok(response) => {
                     let status = response.status().as_u16();
                     let length = response.bytes().await.map(|bytes| bytes.len()).unwrap_or(0);
@@ -338,7 +392,11 @@ async fn xifan_browse_search_episodes_and_play() {
     let mismatch = xifan::play_source(&client, &episode.vid, "xifan:other:1").await;
     report(
         "play_source(分集不属于该剧)",
-        mismatch.as_ref().err().map(|error| why(error)).unwrap_or("居然成功".to_string()),
+        mismatch
+            .as_ref()
+            .err()
+            .map(|error| why(error))
+            .unwrap_or("居然成功".to_string()),
         mismatch.is_err(),
     );
 

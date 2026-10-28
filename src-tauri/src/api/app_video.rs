@@ -11,15 +11,13 @@
 //! per-sample 16-byte IV listed in `senc`, so WebCrypto AES-CTR undoes it.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::core;
 use crate::core::spade::{base64_lenient, clean_url, decrypt_spade_url, derive_content_key};
 use crate::core::tables::VIDEO_UA;
 
-use super::{
-    ApiError, ApiResult, API_DOMAINS, Deadline, MEDIA_DOMAINS, now_millis, request_json,
-};
+use super::{API_DOMAINS, ApiError, ApiResult, Deadline, MEDIA_DOMAINS, now_millis, request_json};
 
 const TIMEOUT_SECS: u64 = 12;
 
@@ -67,7 +65,9 @@ fn parse_fallback(value: Option<&Value>) -> String {
         Some(Value::String(text)) => {
             let trimmed = text.trim();
             match json_body(trimmed) {
-                Some(parsed) => text_from(&parsed["fallback_api"]).unwrap_or_else(|| trimmed.to_string()),
+                Some(parsed) => {
+                    text_from(&parsed["fallback_api"]).unwrap_or_else(|| trimmed.to_string())
+                }
                 None => trimmed.to_string(),
             }
         }
@@ -111,7 +111,10 @@ fn codec_rank(codec: &str) -> u8 {
 
 /// `fetchAppPlayUrl(vid)` in auto-quality mode: prefer H.264, then the largest
 /// picture. Download-oriented quality floors are out of scope for v1.
-pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResult<Vec<MediaVariant>> {
+pub async fn fetch_app_play_url(
+    client: &reqwest::Client,
+    vid: &str,
+) -> ApiResult<Vec<MediaVariant>> {
     if vid.is_empty() || vid.len() > 30 || !vid.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(ApiError::Input("分集编号无效".to_string()));
     }
@@ -163,7 +166,12 @@ pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResul
             .is_some_and(|value| !value.is_null());
         return Err(ApiError::Business {
             message: "App 接口未返回所选分集，已停止取址".to_string(),
-            code: if had_model { "INVALID_RESPONSE" } else { "MISSING_MODEL" }.to_string(),
+            code: if had_model {
+                "INVALID_RESPONSE"
+            } else {
+                "MISSING_MODEL"
+            }
+            .to_string(),
         });
     };
 
@@ -212,7 +220,10 @@ pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResul
             item.is_object()
                 && (!text(item.get("main_url")).is_empty()
                     || !text(item.get("backup_url")).is_empty()
-                    || item.get("backup_url_list").and_then(Value::as_array).is_some())
+                    || item
+                        .get("backup_url_list")
+                        .and_then(Value::as_array)
+                        .is_some())
         })
         .map(Row::from_item)
         .filter(|row| row.codec_rank < 2)
@@ -240,10 +251,12 @@ pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResul
     let mut last_error: Option<ApiError> = None;
 
     for selected in &rows {
-        let spade = selected
-            .item
-            .get("spade_a")
-            .or_else(|| selected.item.get("encrypt_info").and_then(|info| info.get("spade_a")));
+        let spade = selected.item.get("spade_a").or_else(|| {
+            selected
+                .item
+                .get("encrypt_info")
+                .and_then(|info| info.get("spade_a"))
+        });
         let content_key = match spade.map(|value| text(Some(value))) {
             Some(value) if !value.is_empty() => Some(
                 derive_content_key(&value)
@@ -268,7 +281,11 @@ pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResul
             let media = media.trim().to_string();
             match super::checked_url(&media, MEDIA_DOMAINS) {
                 Ok(url) => {
-                    let identity_key = format!("{}:{}", url.as_str(), content_key.clone().unwrap_or_default());
+                    let identity_key = format!(
+                        "{}:{}",
+                        url.as_str(),
+                        content_key.clone().unwrap_or_default()
+                    );
                     if seen.contains(&identity_key) {
                         continue;
                     }
@@ -276,7 +293,11 @@ pub async fn fetch_app_play_url(client: &reqwest::Client, vid: &str) -> ApiResul
                     variants.push(MediaVariant {
                         url: url.into(),
                         content_key: content_key.clone(),
-                        codec: if selected.codec == "bytevc1" { "hevc".to_string() } else { selected.codec.clone() },
+                        codec: if selected.codec == "bytevc1" {
+                            "hevc".to_string()
+                        } else {
+                            selected.codec.clone()
+                        },
                         quality: selected.quality.clone(),
                         width: selected.width,
                         height: selected.height,
@@ -313,11 +334,7 @@ struct Row {
 impl Row {
     fn from_item(item: Value) -> Self {
         let meta = item.get("video_meta").cloned().unwrap_or(Value::Null);
-        let codec = text(
-            item.get("codec_type")
-                .or_else(|| meta.get("codec_type")),
-        )
-        .to_lowercase();
+        let codec = text(item.get("codec_type").or_else(|| meta.get("codec_type"))).to_lowercase();
         let codec_rank = codec_rank(&codec);
         let raw_quality = [
             item.get("quality_desc"),

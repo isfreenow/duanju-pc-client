@@ -18,12 +18,16 @@ pub fn read_router_data(html: &str) -> Result<Value, String> {
     let start: usize = loop {
         let at = find(bytes, needle, from).ok_or("来源页面未返回目录数据，请重试或打开来源页面")?;
         let mut i = at + needle.len();
-        while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'\n' || bytes[i] == b'\r') {
+        while i < bytes.len()
+            && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'\n' || bytes[i] == b'\r')
+        {
             i += 1;
         }
         if i < bytes.len() && bytes[i] == b'=' {
             i += 1;
-            while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'\n' || bytes[i] == b'\r') {
+            while i < bytes.len()
+                && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'\n' || bytes[i] == b'\r')
+            {
                 i += 1;
             }
             if i < bytes.len() && bytes[i] == b'{' {
@@ -205,7 +209,10 @@ mod tests {
     fn entities_decode() {
         // Only the reference's five named entities plus numeric ones decode, and every
         // match needs its trailing semicolon: `&nbsp;` stays literal, `&#x4e2d` too.
-        assert_eq!(decode_html("a&nbsp;&amp;b&#39;c&#x4e2d;d&#101;"), "a&nbsp;&b'c中de");
+        assert_eq!(
+            decode_html("a&nbsp;&amp;b&#39;c&#x4e2d;d&#101;"),
+            "a&nbsp;&b'c中de"
+        );
         assert_eq!(decode_html("&#x4e2d"), "&#x4e2d");
         assert_eq!(decode_html("&#9999999999;"), "&#9999999999;");
         assert_eq!(
@@ -216,8 +223,10 @@ mod tests {
 
     #[test]
     fn missing_router_data_reports_the_reference_message() {
-        assert!(read_router_data("<html>nothing</html>")
-            .unwrap_err()
-            .contains("未返回目录数据"));
+        assert!(
+            read_router_data("<html>nothing</html>")
+                .unwrap_err()
+                .contains("未返回目录数据")
+        );
     }
 }

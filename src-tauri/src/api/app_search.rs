@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::device::parse_search_integer;
-use crate::core::{signed_search_request, SearchCursor, SignRng};
+use crate::core::{SearchCursor, SignRng, signed_search_request};
 
-use super::{ApiError, ApiResult, API_DOMAINS, Deadline, SeriesCard, now_millis, request_json};
+use super::{API_DOMAINS, ApiError, ApiResult, Deadline, SeriesCard, now_millis, request_json};
 
 const SEARCH_TAB: i64 = 11;
 const TIMEOUT_SECS: u64 = 4;
@@ -99,7 +99,9 @@ fn to_cursor(cursor: Option<&SearchPageCursor>) -> Option<SearchCursor> {
 /// `parseSearchPayload`
 pub fn parse_search_payload(payload: &Value, page: i64) -> ApiResult<SearchResult> {
     if !(1..=50).contains(&page) {
-        return Err(ApiError::Input("App 搜索页码需为 1 至 50 的整数".to_string()));
+        return Err(ApiError::Input(
+            "App 搜索页码需为 1 至 50 的整数".to_string(),
+        ));
     }
     if !payload.is_object() {
         return Err(ApiError::Business {
@@ -142,7 +144,11 @@ pub fn parse_search_payload(payload: &Value, page: i64) -> ApiResult<SearchResul
 
     let mut seen: Vec<String> = Vec::new();
     let mut results = Vec::new();
-    for cell in tab.get("data").and_then(Value::as_array).unwrap_or(&Vec::new()) {
+    for cell in tab
+        .get("data")
+        .and_then(Value::as_array)
+        .unwrap_or(&Vec::new())
+    {
         // Header/ad/search-suggestion cells have no video_data; their book_id is
         // not a drama.
         let video = cell
@@ -236,9 +242,7 @@ fn as_text(value: &Value) -> String {
 
 /// `/^\d{1,30}$/`
 fn is_search_id(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 30
-        && value.bytes().all(|byte| byte.is_ascii_digit())
+    !value.is_empty() && value.len() <= 30 && value.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 /// `searchApp` — one signed request against the App search tab.
@@ -253,7 +257,9 @@ pub async fn search_app(
         return Err(ApiError::Input("App 搜索词无效".to_string()));
     }
     if !(1..=50).contains(&page) {
-        return Err(ApiError::Input("App 搜索页码需为 1 至 50 的整数".to_string()));
+        return Err(ApiError::Input(
+            "App 搜索页码需为 1 至 50 的整数".to_string(),
+        ));
     }
     let has_cursor = cursor
         .map(|value| {

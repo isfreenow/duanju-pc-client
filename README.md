@@ -120,8 +120,10 @@
 **给 AI 助手 / 脚本用的命令行入口。** 程序认命令行参数：
 
 ```powershell
-# $APP = 可执行文件路径。安装版默认在 %LOCALAPPDATA%\hongguo-desktop-client\hongguo-desktop-client.exe
-# （找不到就从开始菜单快捷方式右键 → 打开文件位置）；开发态在 src-tauri\target\debug\ 下同名。
+# $APP = 可执行文件路径。安装版产品名已改为中文，exe 名由打包器推导不固定，从注册表卸载项
+# HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.administrator.hongguo-desktop-client
+# 的 InstallLocation 里找（找不到就从开始菜单快捷方式右键 → 打开文件位置）；
+# 开发态在 src-tauri\target\debug\ 下。
 
 & $APP --watch 持械入宋               # 搜关键词并开播
 & $APP 持械入宋                      # 裸参数等价于 --watch

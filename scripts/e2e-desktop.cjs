@@ -1123,7 +1123,7 @@ return typeof window.__H.type === "function";
       out.afterClear = window.__H.many(".history-grid") + "|" + window.__H.all(".favorite-section .card").length;
       out.favStill = window.__H.all(".favorite-section .card").length;
       // 收尾：取消收藏，不给后续跑测留垃圾
-      window.__H.q(".favorite-section .card .fav-remove").click();
+      window.__H.q(".favorite-section .card .card-remove").click();
       out.removeToast = window.__H.text(".toaster .toast") ?? (await window.__H.wait(() => window.__H.q(".toaster .toast"), 5_000, "取消提示").then((el) => el.textContent.trim()).catch(() => ""));
       await window.__H.wait(() => window.__H.all(".favorite-section .card").length === out.favStill - 1, 15_000, "取消收藏").catch(() => null);
       out.favAfterRemove = window.__H.all(".favorite-section .card").length;

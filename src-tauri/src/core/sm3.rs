@@ -18,15 +18,22 @@ pub fn sm3(input: &[u8]) -> Vec<u8> {
     data[total - 8..].copy_from_slice(&bit_len.to_be_bytes());
 
     let mut state: [u32; 8] = [
-        0x7380_166f, 0x4914_b2b9, 0x1724_42d7, 0xda8a_0600,
-        0xa96f_30bc, 0x1631_38aa, 0xe38d_ee4d, 0xb0fb_0e4e,
+        0x7380_166f,
+        0x4914_b2b9,
+        0x1724_42d7,
+        0xda8a_0600,
+        0xa96f_30bc,
+        0x1631_38aa,
+        0xe38d_ee4d,
+        0xb0fb_0e4e,
     ];
     let rotate = |x: u32, n: u32| x.rotate_left(n & 31);
 
     for offset in (0..data.len()).step_by(64) {
         let mut words = vec![0u32; 68];
         for i in 0..16 {
-            words[i] = u32::from_be_bytes(data[offset + i * 4..offset + i * 4 + 4].try_into().unwrap());
+            words[i] =
+                u32::from_be_bytes(data[offset + i * 4..offset + i * 4 + 4].try_into().unwrap());
         }
         for i in 16..68 {
             let x = words[i - 16] ^ words[i - 9] ^ rotate(words[i - 3], 15);
@@ -38,18 +45,27 @@ pub fn sm3(input: &[u8]) -> Vec<u8> {
         for i in 0..64 {
             let a12 = rotate(a, 12);
             let k: u32 = if i < 16 { 0x79cc_4519 } else { 0x7a87_9d8a };
-            let s1 = rotate(a12.wrapping_add(e).wrapping_add(k.rotate_left((i & 31) as u32)), 7);
+            let s1 = rotate(
+                a12.wrapping_add(e)
+                    .wrapping_add(k.rotate_left((i & 31) as u32)),
+                7,
+            );
             let s2 = s1 ^ a12;
-            let ff = if i < 16 { a ^ b ^ c } else { (a & b) | (a & c) | (b & c) };
-            let gg = if i < 16 { e ^ f ^ g } else { (e & f) | (!e & g) };
+            let ff = if i < 16 {
+                a ^ b ^ c
+            } else {
+                (a & b) | (a & c) | (b & c)
+            };
+            let gg = if i < 16 {
+                e ^ f ^ g
+            } else {
+                (e & f) | (!e & g)
+            };
             let t1 = ff
                 .wrapping_add(d)
                 .wrapping_add(s2)
                 .wrapping_add(words[i] ^ words[i + 4]);
-            let t2 = gg
-                .wrapping_add(h)
-                .wrapping_add(s1)
-                .wrapping_add(words[i]);
+            let t2 = gg.wrapping_add(h).wrapping_add(s1).wrapping_add(words[i]);
             d = c;
             c = rotate(b, 9);
             b = a;

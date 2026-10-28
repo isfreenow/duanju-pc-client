@@ -536,6 +536,67 @@ button {
   font-weight: 600;
 }
 
+/* 「我的」页追剧角标：新集数走在封面左上，续作候选另起一行；看过即消。 */
+.badge.update {
+  top: 6px;
+  bottom: auto;
+  left: 6px;
+  right: auto;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.badge.sequel {
+  top: 30px;
+  bottom: auto;
+  left: 6px;
+  right: auto;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/*
+ * 封面右上角的快速收藏钮（.card 与「我的」页的 .card-remove 同款交互）：
+ * 悬停卡片才显形，盖在角标位上；已收藏时悬停把「★ 已收藏」角标让位给 ♥，
+ * 再点即取消。
+ */
+.fav-toggle {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  right: 6px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.card:hover .fav-toggle,
+.fav-toggle:focus-visible {
+  opacity: 1;
+}
+
+.card:hover .fav-toggle ~ .badge.faved,
+.fav-toggle:focus-visible ~ .badge.faved {
+  display: none;
+}
+
+.fav-toggle:hover {
+  color: var(--accent);
+}
+
+.fav-toggle:active {
+  transform: scale(0.82);
+}
+
 .card-body {
   display: flex;
   flex-direction: column;
@@ -876,12 +937,39 @@ button {
   letter-spacing: 0.5px;
 }
 
+/* 品牌名是链接到官网的按钮，悬停点亮成主题红，提示可点。 */
+button.status-brand:hover {
+  color: var(--accent);
+}
+
+/* 版本簇：版本号 / 开发版标识 / 更新状态 / 检查更新融合在右侧同一块内。 */
+.status-ver-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .status-ver {
   color: var(--muted);
 }
 
+/* 开发版徽标：仅 DEV 构建渲染，正式包中该元素不存在，用橙色与正式版区分 */
+.status-env {
+  color: #f5a623;
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .status-spacer {
   flex: 1;
+}
+
+.status-sep {
+  color: var(--muted);
 }
 
 .status-text {
@@ -1481,8 +1569,10 @@ button {
 
 /* ── 「我的」页（历史 + 收藏融合）────────────────────────────────────────────────────── */
 
-/* 收藏卡右上角的取消按钮：.card 本身就是 relative，直接钉在卡片边界上。 */
-.fav-remove {
+/* 卡片右上角的删除按钮（收藏卡取消收藏 / 历史卡删除记录 / 「继续观看」删记录共用）：
+   .card 本身就是 relative，直接钉在卡片边界上，悬停卡片才显形；
+   「继续观看」的挂在 .recent-cover 里（relative + overflow:hidden），同样钉封面右上角。 */
+.card-remove {
   position: absolute;
   z-index: 3;
   top: 6px;
@@ -1500,22 +1590,29 @@ button {
   transition: opacity 0.15s ease, background 0.15s ease;
 }
 
-.card:hover .fav-remove,
-.fav-remove:focus-visible {
+.card:hover .card-remove,
+.recent-card:hover .card-remove,
+.card-remove:focus-visible {
   opacity: 1;
 }
 
-.fav-remove:hover {
+/* 悬停时「★ 已收藏」角标让位给 ✕，和 CardTile 的 ♡ 同一套处理（✕ 排在角标之前才用 ~）。 */
+.recent-card:hover .card-remove ~ .badge.faved {
+  display: none;
+}
+
+.card-remove:hover {
   background: rgba(255, 90, 95, 0.9);
 }
 
 /* 按下就缩一下：✕ 的反馈不能只靠那张卡自己消失。 */
-.fav-remove:active {
+.card-remove:active {
   transform: scale(0.82);
 }
 
 /* 被 ✕ 命中的卡：原地缩小淡出，比直接从网格里抽走更好接住。 */
-.card:has(> .fav-remove:active) {
+.card:has(> .card-remove:active),
+.recent-card:has(.card-remove:active) {
   animation: fav-card-out 0.2s ease-in forwards;
 }
 
@@ -1826,12 +1923,18 @@ button {
 }
 
 .screen-blank {
+  /* <video> 常驻舞台，失败态是盖在它上面的叠层，不抢布局。 */
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: start;
+  gap: 12px;
   width: min(640px, 86vw);
+  margin: 0 auto;
   padding: 24px;
   color: var(--muted);
-  display: grid;
-  gap: 12px;
-  justify-items: start;
 }
 
 .screen-blank .next {
@@ -1840,6 +1943,215 @@ button {
   border: 1px solid var(--line);
   background: var(--panel-2);
   color: var(--text);
+}
+
+/*
+ * 自建控制条：接管原生 controls（Chromium 不开放它的样式定制），配色全部走
+ * 主题变量：轨道底灰用 --line，已缓冲用 --panel-2，进度用 --accent。
+ */
+.player-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  padding: 28px 18px 10px;
+  background: linear-gradient(to top, rgba(6, 7, 9, 0.92), rgba(6, 7, 9, 0.55) 58%, transparent);
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+/* 鼠标静置：控制条滑下去、光标也跟着藏起来，画面是唯一的正事。 */
+.player-stage.ui-idle {
+  cursor: none;
+}
+
+.player-stage.ui-idle .player-controls {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.progress-track {
+  position: relative;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.progress-track::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.progress-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: transparent;
+  transition: height 0.12s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.progress-track:hover::before {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-buffered,
+.progress-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.progress-track:hover .progress-buffered,
+.progress-track:hover .progress-fill {
+  height: 6px;
+}
+
+.progress-buffered {
+  background: var(--panel-2);
+  z-index: 0;
+}
+
+.progress-fill {
+  background: var(--accent);
+  z-index: 2;
+}
+
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translateY(-50%) scale(0);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(229, 9, 20, 0.6);
+  transition: transform 0.12s ease;
+}
+
+.progress-track:hover .progress-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.ctrl-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: #fff;
+}
+
+.ctrl-btn:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 图标全部换成 lucide（Play/Pause/SkipBack/SkipForward/Volume/Maximize）：
+   SVG 跟着按钮文字色走，hover 变白、disabled 变灰不用另写一套。 */
+.ctrl-btn svg {
+  display: block;
+  color: inherit;
+}
+
+.ctrl-time {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.ctrl-spacer {
+  flex: 1;
+}
+
+.ctrl-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 自绘横向音量条：底槽 --line、填充 --accent，和进度条同一套语言。
+   默认收起，悬浮声音图标时露出：竖条常驻 DOM、只用 CSS 控制显隐，
+   若改回 React 条件渲染，鼠标移向途中 pointerleave 会把弹层卸载、永远够不到；
+   紧贴按钮（gap 6px）保证图标→滑条的悬停路径连续，:active 兜住按住拖出轨道的情况。 */
+.volume-track {
+  position: relative;
+  width: 84px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  cursor: pointer;
+  touch-action: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.ctrl-volume:hover .volume-track,
+.volume-track:active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.volume-fill {
+  display: block;
+  height: 4px;
+  min-width: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  transition: width 0.08s ease;
 }
 
 /*

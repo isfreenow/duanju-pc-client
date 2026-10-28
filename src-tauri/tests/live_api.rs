@@ -60,7 +60,11 @@ async fn live_paths_still_return_data() {
                     !page.results.is_empty(),
                 )
             }
-            Err(error) => report("browse_list", format!("{category} → {}", why(&error)), false),
+            Err(error) => report(
+                "browse_list",
+                format!("{category} → {}", why(&error)),
+                false,
+            ),
         }
     }
 
@@ -75,7 +79,12 @@ async fn live_paths_still_return_data() {
             }
             report(
                 "search_web",
-                format!("{} 条，第 {} 页，共 {} 页", result.results.len(), result.page, result.total_pages),
+                format!(
+                    "{} 条，第 {} 页，共 {} 页",
+                    result.results.len(),
+                    result.page,
+                    result.total_pages
+                ),
                 !result.results.is_empty(),
             );
         }
@@ -128,7 +137,11 @@ async fn live_paths_still_return_data() {
     let mut vids: Vec<String> = Vec::new();
     match web::fetch_episode_list(&client, &series_id).await {
         Ok(list) => {
-            vids = list.episodes.iter().map(|episode| episode.vid.clone()).collect();
+            vids = list
+                .episodes
+                .iter()
+                .map(|episode| episode.vid.clone())
+                .collect();
             report(
                 "fetch_episode_list",
                 format!(
@@ -184,14 +197,21 @@ async fn live_paths_still_return_data() {
             ),
             api::is_public_media_url(&source.url),
         ),
-        Ok(None) => report("fetch_public_play_url", "官网只提供预览或无可播链接".to_string(), true),
+        Ok(None) => report(
+            "fetch_public_play_url",
+            "官网只提供预览或无可播链接".to_string(),
+            true,
+        ),
         Err(error) => report("fetch_public_play_url", why(&error), false),
     }
 
     // 6. Signed App playback: report codec coverage and how many rows are CENC.
     match app_video::fetch_app_play_url(&client, &vid).await {
         Ok(variants) => {
-            let encrypted = variants.iter().filter(|row| row.content_key.is_some()).count();
+            let encrypted = variants
+                .iter()
+                .filter(|row| row.content_key.is_some())
+                .count();
             report(
                 "fetch_app_play_url (signed)",
                 format!(
@@ -206,7 +226,12 @@ async fn live_paths_still_return_data() {
                         .iter()
                         .map(|row| row.quality.as_str())
                         .collect::<Vec<_>>(),
-                    host_of(&variants.first().map(|row| row.url.clone()).unwrap_or_default())
+                    host_of(
+                        &variants
+                            .first()
+                            .map(|row| row.url.clone())
+                            .unwrap_or_default()
+                    )
                 ),
                 !variants.is_empty(),
             );
@@ -273,9 +298,15 @@ async fn sample_source_coverage_across_the_hot_list() {
 #[ignore = "requires network access; downloads 64 KiB of one real episode"]
 async fn inspect_one_resolved_stream_container() {
     let client = api::build_client().expect("client");
-    let catalog = web::browse_list(&client, "hot-drama", "", 1, true).await.expect("榜单");
-    let list = web::fetch_episode_list(&client, &catalog.results[0].series_id).await.expect("分集");
-    let variants = app_video::fetch_app_play_url(&client, &list.episodes[0].vid).await.expect("片源");
+    let catalog = web::browse_list(&client, "hot-drama", "", 1, true)
+        .await
+        .expect("榜单");
+    let list = web::fetch_episode_list(&client, &catalog.results[0].series_id)
+        .await
+        .expect("分集");
+    let variants = app_video::fetch_app_play_url(&client, &list.episodes[0].vid)
+        .await
+        .expect("片源");
     let variant = &variants[0];
 
     let response = client
@@ -300,12 +331,17 @@ async fn inspect_one_resolved_stream_container() {
         .to_string();
     let body = response.bytes().await.expect("字节");
 
-    let ascii = |needle: &str| body.windows(needle.len()).any(|window| window == needle.as_bytes());
-    let found: Vec<&str> = ["ftyp", "moov", "mdat", "styp", "sidx", "avc1", "hvc1", "hev1", "byte", "encv", "mp4a"]
-        .iter()
-        .copied()
-        .filter(|needle| ascii(needle))
-        .collect();
+    let ascii = |needle: &str| {
+        body.windows(needle.len())
+            .any(|window| window == needle.as_bytes())
+    };
+    let found: Vec<&str> = [
+        "ftyp", "moov", "mdat", "styp", "sidx", "avc1", "hvc1", "hev1", "byte", "encv", "mp4a",
+    ]
+    .iter()
+    .copied()
+    .filter(|needle| ascii(needle))
+    .collect();
     let brand = if body.len() > 12 && &body[4..8] == b"ftyp" {
         String::from_utf8_lossy(&body[8..12]).to_string()
     } else {

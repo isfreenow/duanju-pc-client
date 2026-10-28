@@ -3,15 +3,16 @@
  *
  * The grid is shared by browse, search and ranking results because all three hand
  * back the same `SeriesCard`; the only difference is which labels the site chose
- * to fill in.
+ * to fill in. 卡面上的快速收藏 ♡ 也只在 `CardTile` 里实现一次，所有网格共享。
  *
  * `clock` and `episodeOf` live here too because three views show the same
  * "看到哪儿了" line: 首页的最近播放行、详情页的继续播放条、「我的」页。
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { Episode, Genre, ProgressRow, SeriesCard } from "../ipc/client";
-import { useFavoriteIds } from "../favorites";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { toggleFavorite, removeHistory, type Episode, type Genre, type ProgressRow, type SeriesCard } from "../ipc/client";
+import { setFavoriteId, useFavoriteIds } from "../favorites";
+import { toast } from "./Toast";
 
 /**
  * 鼠标在横向轨道上长按拖动即可左右滚动（Netflix 式）。只在轨道确实能横向滚时
@@ -161,12 +162,38 @@ export function Cover({
 /** 一部剧的海报卡片：竖版封面 + 标题 + 集数/热度 + 标签。网格与横向行共用。 */
 function CardTile({ card, onPick }: { card: SeriesCard; onPick: (card: SeriesCard) => void }) {
   const favoriteIds = useFavoriteIds();
+  const favorited = favoriteIds.has(card.seriesId);
+  // 快速收藏与详情页同款乐观链：先翻快照 + toast，IPC 回话不一致或报错再纠偏。
+  // 卡片上没有类目信息，记空串——与 ContinueRail 重播时的行为一致。
+  const quickToggle = async (event: ReactMouseEvent) => {
+    event.stopPropagation();
+    const next = !favorited;
+    setFavoriteId(card.seriesId, next);
+    toast(next ? `已收藏《${card.seriesTitle}》` : `已取消收藏《${card.seriesTitle}》`);
+    try {
+      const confirmed = await toggleFavorite({ seriesId: card.seriesId, seriesTitle: card.seriesTitle, cover: card.cover });
+      setFavoriteId(card.seriesId, confirmed);
+      if (confirmed !== next) toast(next ? "收藏没存上，已回到原样" : "取消没存上，仍是收藏");
+    } catch {
+      setFavoriteId(card.seriesId, !next);
+      toast("没存上，已回到原样");
+    }
+  };
   return (
     <button type="button" className="card" onClick={() => onPick(card)}>
       <Cover src={card.cover} alt={card.seriesTitle} title={card.seriesTitle}>
         {card.rank !== undefined && <span className="badge rank">{card.rank}</span>}
         {card.episodeCount > 0 && <span className="badge count">{card.episodeCount} 集</span>}
-        {favoriteIds.has(card.seriesId) && <span className="badge faved">★ 已收藏</span>}
+        {favorited && <span className="badge faved">★ 已收藏</span>}
+        <span
+          className={favorited ? "fav-toggle faved" : "fav-toggle"}
+          role="button"
+          aria-label={favorited ? `取消收藏 ${card.seriesTitle}` : `收藏 ${card.seriesTitle}`}
+          title={favorited ? "取消收藏" : "收藏"}
+          onClick={quickToggle}
+        >
+          {favorited ? "♥" : "♡"}
+        </span>
       </Cover>
       <span className="card-body">
         <span className="title">{card.seriesTitle}</span>
@@ -225,6 +252,8 @@ export function PosterRail({
 /**
  * 顶部「继续观看」轨道：与正常剧集卡同比例的竖版海报 + 底部进度线。
  * `categoryOf` 决定重播时记回哪个类目（首页用记录自己的类目，第三方页签用当前页签）。
+ * 悬停卡片右上角出 ✕ 删除观看记录，与「我的」页最近观看同一套乐观链：先隐卡 +
+ * toast，存失败再放回并说明。
  */
 export function ContinueRail({
   rows,
@@ -239,14 +268,31 @@ export function ContinueRail({
 }) {
   const ref = useDragHorizontalScroll<HTMLDivElement>();
   const favoriteIds = useFavoriteIds();
-  if (rows.length === 0) return null;
+  // 按 seriesId 隐：remove_history 也是整部删，同部剧的多条记录一起消失才对得上。
+  const [removed, setRemoved] = useState<Set<string>>(() => new Set());
+  const visibleRows = useMemo(() => rows.filter((row) => !removed.has(row.seriesId)), [rows, removed]);
+  if (visibleRows.length === 0) return null;
+  const removeWatched = async (row: ProgressRow) => {
+    setRemoved((prev) => new Set(prev).add(row.seriesId));
+    toast(`已删除《${row.seriesTitle}》的观看记录`);
+    try {
+      await removeHistory(row.seriesId);
+    } catch {
+      setRemoved((prev) => {
+        const next = new Set(prev);
+        next.delete(row.seriesId);
+        return next;
+      });
+      toast("删除没存上，已回到原样");
+    }
+  };
   return (
     <section className="recent" aria-label={title}>
       <header className="recent-head">
         <h3>{title}</h3>
       </header>
       <div className="recent-row" ref={ref}>
-        {rows.map((row) => (
+        {visibleRows.map((row) => (
           <button
             key={`${row.seriesId}-${row.vid}`}
             type="button"
@@ -254,6 +300,18 @@ export function ContinueRail({
             onClick={() => onPlay(episodeOf(row, categoryOf(row)), row.finished ? 0 : row.seconds)}
           >
             <Cover src={row.cover} alt={row.seriesTitle} title={row.seriesTitle} className="recent-cover">
+              <span
+                className="card-remove"
+                role="button"
+                aria-label={`删除 ${row.seriesTitle} 的观看记录`}
+                title="删除观看记录"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void removeWatched(row);
+                }}
+              >
+                ✕
+              </span>
               {favoriteIds.has(row.seriesId) && <span className="badge faved">★ 已收藏</span>}
               {!row.finished && row.duration > 0 && (
                 <span className="recent-progress" aria-hidden="true">

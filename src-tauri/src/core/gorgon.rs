@@ -58,9 +58,13 @@ pub fn x_gorgon(query: &str, body: Option<&[u8]>, timestamp: u32, random: u16) -
     input.extend(timestamp.to_be_bytes());
 
     let key = [
-        0x4a, 0x40, 0x16,
+        0x4a,
+        0x40,
+        0x16,
         ((random >> 8) & 255) as u8,
-        0x47, 0x6c, 0x01,
+        0x47,
+        0x6c,
+        0x01,
         (random & 255) as u8,
     ];
     let mut out = rc4_gorgon(&input, &key);

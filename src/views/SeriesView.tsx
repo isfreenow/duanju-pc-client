@@ -85,10 +85,17 @@ export function SeriesView({
   onCategory?: () => void;
   onPick: (card: SeriesCard) => void;
 }) {
-  const list = useAsync(() => getSeriesEpisodes(seriesId), [seriesId, refresh]);
+  const list = useAsync(() => getSeriesEpisodes(seriesId), [seriesId, refresh], {
+    cacheKey: `episodes:${seriesId}`,
+    keepStale: true,
+  });
   const details = useAsync(() => getPublicDetails(seriesId), [seriesId, refresh]);
   const progress = useAsync(() => latestProgress(seriesId), [seriesId, refresh]);
-  const pool = useAsync(() => browseList(category === "history" ? "hot-drama" : category, "", 1), [category, refresh]);
+  const pool = useAsync(
+    () => browseList(category === "history" ? "hot-drama" : category, "", 1),
+    [category, refresh],
+    { cacheKey: `browse:${category === "history" ? "hot-drama" : category}::1`, keepStale: true },
+  );
   // 收藏状态只有一个来源：点亮/取消都是就地改那份快照，点下去当场翻面，不等 IPC 回来。
   const favoriteIds = useFavoriteIds();
   const favorited = favoriteIds.has(seriesId);

@@ -5,7 +5,8 @@
 //! follow-up escaping of `!'()`. Python's `urllib.parse.quote` behaves the same
 //! way for these characters, which is why the reference calls it that.
 
-const JS_UNRESERVED: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()";
+const JS_UNRESERVED: &[u8] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()";
 
 /// `encodeURIComponent` equivalent: everything outside the JS unreserved set is
 /// percent-encoded from its UTF-8 bytes, uppercase hex.

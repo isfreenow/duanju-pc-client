@@ -14,8 +14,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use url::Url;
@@ -31,13 +32,22 @@ pub const WEB_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 pub const WEB_REFERER: &str = "https://hongguoduanju.com/";
 const TIMEOUT_SECS: u64 = 10;
 const PLAY_TIMEOUT_SECS: u64 = 4;
+// 分集页竞速的两档预算：第一档短，健康的页早回来了就不再加压；第二档放宽，
+// 并补一条普通解析的退路。
+const EPISODE_FIRST_SECS: u64 = 2;
+const EPISODE_RETRY_SECS: u64 = 4;
 const MAX_PAGE_BYTES: usize = 8 * 1024 * 1024;
 // 分类页与热播页共用同一份目录缓存；30 秒过短会让每次切页都直连来源。
 const CATALOG_CACHE: Duration = Duration::from_secs(120);
 const DETAILS_CACHE: Duration = Duration::from_secs(30);
 
 const CATEGORIES: &[&str] = &["real-drama", "comic-drama", "ai-drama", "comic"];
-const RANKINGS: &[&str] = &["hot-drama", "hot-real-drama", "hot-comic-drama", "hot-ai-drama"];
+const RANKINGS: &[&str] = &[
+    "hot-drama",
+    "hot-real-drama",
+    "hot-comic-drama",
+    "hot-ai-drama",
+];
 
 fn is_digits(value: &str) -> bool {
     !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
@@ -204,10 +214,7 @@ fn store(key: &str, value: &Value) {
                 guard.remove(&key);
             }
         }
-        guard.insert(
-            key.to_string(),
-            (std::time::Instant::now(), value.clone()),
-        );
+        guard.insert(key.to_string(), (std::time::Instant::now(), value.clone()));
     }
 }
 
@@ -232,8 +239,16 @@ pub async fn browse_list(
     let url = format!(
         "{SITE}/{}/{category}{}{}",
         if ranking { "rank" } else { "category" },
-        if genre.is_empty() { String::new() } else { format!("/{genre}") },
-        if page > 1 { format!("?page={page}") } else { String::new() }
+        if genre.is_empty() {
+            String::new()
+        } else {
+            format!("/{genre}")
+        },
+        if page > 1 {
+            format!("?page={page}")
+        } else {
+            String::new()
+        }
     );
 
     if !force_refresh {
@@ -244,7 +259,7 @@ pub async fn browse_list(
         }
     }
 
-    let html = fetch_site_html(client, &url, TIMEOUT_SECS).await?;
+    let html = fetch_site_html(client, &url, TIMEOUT_SECS, super::FetchKind::Site).await?;
     let page_data = if ranking {
         parse_ranking(&html, category, page, &url)
     } else {
@@ -256,18 +271,27 @@ pub async fn browse_list(
     Ok(page_data)
 }
 
-async fn fetch_site_html(client: &reqwest::Client, url: &str, secs: u64) -> ApiResult<String> {
+async fn fetch_site_html(
+    client: &reqwest::Client,
+    url: &str,
+    secs: u64,
+    kind: super::FetchKind,
+) -> ApiResult<String> {
     let deadline = Deadline::after(secs);
     super::fetch_text(
         client,
         url,
         &[
             ("User-Agent", WEB_UA),
-            ("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+            (
+                "Accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            ),
             ("Accept-Language", "zh-CN,zh;q=0.9"),
             ("Referer", WEB_REFERER),
             ("Cache-Control", "no-cache"),
         ],
+        kind,
         deadline,
         MAX_PAGE_BYTES,
     )
@@ -275,7 +299,12 @@ async fn fetch_site_html(client: &reqwest::Client, url: &str, secs: u64) -> ApiR
 }
 
 /// `parseCatalog` — `recommendList` plus the genre selector rows.
-pub fn parse_catalog(html: &str, category: &str, page: u32, source_url: &str) -> ApiResult<CatalogPage> {
+pub fn parse_catalog(
+    html: &str,
+    category: &str,
+    page: u32,
+    source_url: &str,
+) -> ApiResult<CatalogPage> {
     let router = read_router_data(html).map_err(ApiError::Input)?;
     let data = router
         .get("loaderData")
@@ -289,7 +318,9 @@ pub fn parse_catalog(html: &str, category: &str, page: u32, source_url: &str) ->
             })
         });
     let invalid = || ApiError::Input("来源目录暂不可用，请重试或打开来源页面".to_string());
-    let Some(data) = data else { return Err(invalid()) };
+    let Some(data) = data else {
+        return Err(invalid());
+    };
     if data.get("isSuccess").and_then(Value::as_bool) == Some(false) {
         return Err(invalid());
     }
@@ -308,7 +339,8 @@ pub fn parse_catalog(html: &str, category: &str, page: u32, source_url: &str) ->
             source_url: source_url.to_string(),
             unsupported: Some(true),
             empty_message: Some(
-                "漫画属于图文阅读，暂不支持视频播放或下载；请切换「漫剧」或打开来源页面阅读。".to_string(),
+                "漫画属于图文阅读，暂不支持视频播放或下载；请切换「漫剧」或打开来源页面阅读。"
+                    .to_string(),
             ),
         });
     }
@@ -350,11 +382,17 @@ pub fn parse_catalog(html: &str, category: &str, page: u32, source_url: &str) ->
         .map(|rows| {
             rows.iter()
                 .flat_map(|row| {
-                    row.get("items").and_then(Value::as_array).cloned().unwrap_or_default()
+                    row.get("items")
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default()
                 })
                 .filter_map(|item| {
                     let slug = trimmed(item.get("selector_item_id"));
-                    let label = item.get("show_name").and_then(Value::as_str).unwrap_or_default();
+                    let label = item
+                        .get("show_name")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
                     (is_slug(&slug) && !label.is_empty()).then_some(Genre {
                         slug,
                         label: label.to_string(),
@@ -392,7 +430,10 @@ fn string_list(value: Option<&Value>, limit: usize) -> Vec<String> {
             items
                 .iter()
                 .filter_map(|item| {
-                    item.as_str().map(str::trim).filter(|text| !text.is_empty()).map(str::to_string)
+                    item.as_str()
+                        .map(str::trim)
+                        .filter(|text| !text.is_empty())
+                        .map(str::to_string)
                 })
                 .take(limit)
                 .collect()
@@ -402,7 +443,12 @@ fn string_list(value: Option<&Value>, limit: usize) -> Vec<String> {
 
 /// `parseRanking` — the resolved loader payload when the page ships one, and the
 /// rendered `<article>` cards as a fallback for streaming responses.
-pub fn parse_ranking(html: &str, category: &str, page: u32, source_url: &str) -> ApiResult<CatalogPage> {
+pub fn parse_ranking(
+    html: &str,
+    category: &str,
+    page: u32,
+    source_url: &str,
+) -> ApiResult<CatalogPage> {
     let mut data: Option<Value> = None;
     // /<script\b([^>]*)>/gi with data-fn-name="mergeLoaderData"
     for head in script_heads(html) {
@@ -477,10 +523,7 @@ pub fn parse_ranking(html: &str, category: &str, page: u32, source_url: &str) ->
 
     // /<nav\b[^>]*aria-label=["']榜单分页["'][^>]*>([\s\S]*?)<\/nav>/i
     let nav = find_element(html, "nav", 0, |head| {
-        matches!(
-            attribute(head, "aria-label").as_deref(),
-            Some("榜单分页")
-        )
+        matches!(attribute(head, "aria-label").as_deref(), Some("榜单分页"))
     })
     .and_then(|(_, inner_start, _)| slice_to(html, inner_start, "</nav>"))
     .unwrap_or_default();
@@ -545,12 +588,20 @@ fn strip_brand(text: &str) -> String {
 /// Trim surrounding whitespace and dangling SEO separators from a title edge.
 fn trim_seps(s: &str) -> &str {
     let is_sep = |c: char| matches!(c, '-' | '–' | '—' | '|' | '·' | '｜');
-    s.trim().trim_start_matches(is_sep).trim_end_matches(is_sep).trim()
+    s.trim()
+        .trim_start_matches(is_sep)
+        .trim_end_matches(is_sep)
+        .trim()
 }
 
 fn normalize_rank_item(item: &Value, seen: &mut HashSet<String>) -> Option<super::SeriesCard> {
     let id = trimmed(item.get("seriesId"));
-    let title = item.get("title").and_then(Value::as_str).unwrap_or_default().trim().to_string();
+    let title = item
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
     let rank = count(item.get("rank")).filter(|value| *value >= 1.0 && *value < 9e15)? as u32;
     if !is_series_id(&id) || title.is_empty() || seen.contains(&id) {
         return None;
@@ -574,7 +625,13 @@ fn normalize_rank_item(item: &Value, seen: &mut HashSet<String>) -> Option<super
         url: format!("{SITE}/detail?series_id={id}"),
         description: None,
         rank: Some(rank),
-        heat: Some(item.get("heatText").and_then(Value::as_str).unwrap_or_default().trim().to_string()),
+        heat: Some(
+            item.get("heatText")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
+        ),
         metadata: PublicMetadata::from_item(item),
     })
 }
@@ -714,7 +771,10 @@ fn script_heads(html: &str) -> Vec<&str> {
 }
 
 fn is_tag_delimiter(byte: Option<u8>) -> bool {
-    matches!(byte, None | Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r') | Some(b'>'))
+    matches!(
+        byte,
+        None | Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'\r') | Some(b'>')
+    )
 }
 
 /// Locate the first `<name …>` whose head passes `accept`. Returns the head text,
@@ -860,7 +920,11 @@ trait OriginString {
 
 impl OriginString for Url {
     fn origin_string(&self) -> String {
-        let mut origin = format!("{}://{}", self.scheme(), self.host_str().unwrap_or_default());
+        let mut origin = format!(
+            "{}://{}",
+            self.scheme(),
+            self.host_str().unwrap_or_default()
+        );
         if let Some(port) = self.port() {
             origin.push_str(&format!(":{port}"));
         }
@@ -870,20 +934,52 @@ impl OriginString for Url {
 
 // ── Episode list ─────────────────────────────────────────────────────────
 
-/// `fetchEpisodeListFromWeb` — the player page's `seriesDetail.vid_list` is the
-/// authoritative episode list (index order is episode order).
-pub async fn fetch_episode_list(client: &reqwest::Client, series_id: &str) -> ApiResult<EpisodeList> {
-    if !is_digits(series_id) || series_id.len() > 30 {
-        return Err(ApiError::Input("剧集编号无效".to_string()));
-    }
-    let url = format!("{SITE}/player/{}", encode_uri_component(series_id));
-    if let Some(value) = cached(&url, CATALOG_CACHE) {
-        if let Ok(list) = serde_json::from_value::<EpisodeList>(value) {
-            return Ok(list);
+/// 分集页「熔断」表：某一部在双路线竞速里彻底失败后，记下到某个时刻为止不再
+/// 重走那条慢路。键是 `series_id`，值是冷却截止的 `Instant`。参考实现把 web 片源
+/// 失败的 vid 熔断 5 分钟，这里熔断的对象是分集页（一部一个键），语义一致：坏
+/// 掉的 CDN 边缘不该让每次切集都再撞一遍。
+fn episode_breaker() -> &'static Mutex<HashMap<String, Instant>> {
+    static BREAKER: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
+    BREAKER.get_or_init(Default::default)
+}
+
+fn episode_tripped(series_id: &str) -> bool {
+    episode_breaker()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(series_id).map(|until| Instant::now() < *until))
+        .unwrap_or(false)
+}
+
+/// 记一次失败：5 分钟内跳过竞速直接快速失败。表只留最近 128 部，先清已过期的。
+fn trip_episode(series_id: &str) {
+    if let Ok(mut map) = episode_breaker().lock() {
+        let now = Instant::now();
+        map.retain(|_, until| *until > now);
+        if map.len() >= 128 {
+            if let Some(oldest) = map
+                .iter()
+                .min_by_key(|(_, until)| *until)
+                .map(|(key, _)| key.clone())
+            {
+                map.remove(&oldest);
+            }
         }
+        map.insert(series_id.to_string(), now + Duration::from_secs(5 * 60));
     }
-    let html = fetch_site_html(client, &url, TIMEOUT_SECS).await?;
-    let router = read_router_data(&html).map_err(ApiError::Input)?;
+}
+
+fn clear_episode(series_id: &str) {
+    if let Ok(mut map) = episode_breaker().lock() {
+        map.remove(series_id);
+    }
+}
+
+/// `parseEpisodeListHtml` — 从 player 或 detail 页的 router data 里取分集。两条
+/// 路线的 loaderData 键不同（`player_(series_id)/page`、`player_(series_id)/(vid)/page`
+/// 或 `detail_page`），都指向同一个带 `seriesDetail.vid_list` 的当前剧集对象。
+fn parse_episode_page(html: &str, series_id: &str) -> ApiResult<EpisodeList> {
+    let router = read_router_data(html).map_err(ApiError::Input)?;
     let mismatch = || ApiError::Input("官网返回的剧集与请求不一致或缺少剧集身份".to_string());
     let loader = router.get("loaderData").and_then(Value::as_object);
     // Read identity and episodes from the same current-player object, never
@@ -891,14 +987,15 @@ pub async fn fetch_episode_list(client: &reqwest::Client, series_id: &str) -> Ap
     let data = loader.and_then(|rows| {
         rows.get("player_(series_id)/page")
             .or_else(|| rows.get("player_(series_id)/(vid)/page"))
+            .or_else(|| rows.get("detail_page"))
     });
-    let Some(data) = data else { return Err(mismatch()) };
+    let Some(data) = data else {
+        return Err(mismatch());
+    };
     let detail = &data["seriesDetail"];
     let detail_id = trimmed(detail.get("series_id"));
     let page_id = trimmed(data.get("series_id"));
-    let page_id_present = data
-        .get("series_id")
-        .is_some_and(|value| !value.is_null());
+    let page_id_present = data.get("series_id").is_some_and(|value| !value.is_null());
     if data.get("isSuccess").and_then(Value::as_bool) == Some(false)
         || !is_digits(&detail_id)
         || detail_id.len() > 30
@@ -911,7 +1008,10 @@ pub async fn fetch_episode_list(client: &reqwest::Client, series_id: &str) -> Ap
     let Some(vids_value) = detail.get("vid_list").and_then(Value::as_array) else {
         return Err(invalid());
     };
-    let vids: Vec<String> = vids_value.iter().map(|value| trimmed(Some(value))).collect();
+    let vids: Vec<String> = vids_value
+        .iter()
+        .map(|value| trimmed(Some(value)))
+        .collect();
     if vids.iter().any(|vid| !is_digits(vid) || vid.len() > 30) {
         return Err(ApiError::Input("官网分集数据异常".to_string()));
     }
@@ -921,7 +1021,6 @@ pub async fn fetch_episode_list(client: &reqwest::Client, series_id: &str) -> Ap
     if vids.is_empty() {
         return Err(ApiError::Input("官网分集列表为空".to_string()));
     }
-
     let series_title = detail
         .get("series_name")
         .and_then(Value::as_str)
@@ -939,8 +1038,7 @@ pub async fn fetch_episode_list(client: &reqwest::Client, series_id: &str) -> Ap
         .filter(|value| is_digits(value))
         .and_then(|value| value.parse::<u64>().ok())
         .map(|value| (value as usize).min(vids.len()) as u32);
-
-    let list = EpisodeList {
+    Ok(EpisodeList {
         series_id: series_id.to_string(),
         series_title: series_title.clone(),
         cover: cover.clone(),
@@ -960,11 +1058,140 @@ pub async fn fetch_episode_list(client: &reqwest::Client, series_id: &str) -> Ap
             })
             .collect(),
         source: "web".to_string(),
-    };
-    if let Ok(value) = serde_json::to_value(&list) {
-        store(&url, &value);
+    })
+}
+
+/// 一条分集路线：取某一 URL 的页面 HTML，按 `parse_episode_page` 解析。解析失败
+/// 与网络失败都算这一条路线失败，交给竞速层处理。
+async fn episode_route(
+    client: &reqwest::Client,
+    url: String,
+    series_id: String,
+    kind: super::FetchKind,
+    secs: u64,
+) -> ApiResult<EpisodeList> {
+    let html = fetch_site_html(client, &url, secs, kind).await?;
+    parse_episode_page(&html, &series_id)
+}
+
+/// 并发跑同一 `kind` 下的两条路线，返回第一个解析成功的片单；都失败返回 `None`。
+async fn race_episode_routes(
+    client: &reqwest::Client,
+    series_id: &str,
+    player: &str,
+    detail: &str,
+    kind: super::FetchKind,
+    secs: u64,
+) -> Option<EpisodeList> {
+    let mut set = FuturesUnordered::new();
+    set.push(episode_route(
+        client,
+        player.to_string(),
+        series_id.to_string(),
+        kind,
+        secs,
+    ));
+    set.push(episode_route(
+        client,
+        detail.to_string(),
+        series_id.to_string(),
+        kind,
+        secs,
+    ));
+    while let Some(outcome) = set.next().await {
+        if let Ok(list) = outcome {
+            return Some(list);
+        }
     }
-    Ok(list)
+    None
+}
+
+/// 成功片单落进按 player URL 归键的目录缓存，便于后续切页命中。
+fn remember_episode(url: &str, list: EpisodeList) -> EpisodeList {
+    if let Ok(value) = serde_json::to_value(&list) {
+        store(url, &value);
+    }
+    list
+}
+
+/// `fetchEpisodeListFromWeb` — 双路线竞速 + 熔断。
+///
+/// 有些 `/player` 页会从一台坏掉的 CDN 边缘取到（挂了再断），而同剧的 `/detail`
+/// 路线是健康的；官网那一跳的可信 DNS（DoH）也可能整体被墙。于是：先让 player 与
+/// detail 两条路线、可信 DNS 并发竞速（短预算），都不成就放宽预算重试，再补一条
+/// 普通系统解析的退路。任一路线解析出合法片单即返回。两轮都落则熔断该部，
+/// 切集时直接快速失败而不是反复撞坏边缘。
+pub async fn fetch_episode_list(
+    client: &reqwest::Client,
+    series_id: &str,
+) -> ApiResult<EpisodeList> {
+    if !is_digits(series_id) || series_id.len() > 30 {
+        return Err(ApiError::Input("剧集编号无效".to_string()));
+    }
+    let player = format!("{SITE}/player/{}", encode_uri_component(series_id));
+    if let Some(value) = cached(&player, CATALOG_CACHE) {
+        if let Ok(list) = serde_json::from_value::<EpisodeList>(value) {
+            return Ok(list);
+        }
+    }
+    if episode_tripped(series_id) {
+        return Err(ApiError::Business {
+            message: "官网分集暂时不可用，稍后会自动重试".to_string(),
+            code: "SOURCE".to_string(),
+        });
+    }
+    let detail = format!(
+        "{SITE}/detail?series_id={}",
+        encode_uri_component(series_id)
+    );
+    // 第一轮：两条路线并发，可信 DNS。谁先给出合法片单用谁。
+    if let Some(list) = race_episode_routes(
+        client,
+        series_id,
+        &player,
+        &detail,
+        super::FetchKind::Site,
+        EPISODE_FIRST_SECS,
+    )
+    .await
+    {
+        clear_episode(series_id);
+        return Ok(remember_episode(&player, list));
+    }
+    // 第二轮：放宽预算再可信一次；仍不成则换普通系统解析，DoH 端点被墙时也能出片单。
+    let mut raced = race_episode_routes(
+        client,
+        series_id,
+        &player,
+        &detail,
+        super::FetchKind::Site,
+        EPISODE_RETRY_SECS,
+    )
+    .await;
+    if raced.is_none() {
+        raced = race_episode_routes(
+            client,
+            series_id,
+            &player,
+            &detail,
+            super::FetchKind::SitePlain,
+            EPISODE_RETRY_SECS,
+        )
+        .await;
+    }
+    match raced {
+        Some(list) => {
+            clear_episode(series_id);
+            Ok(remember_episode(&player, list))
+        }
+        None => {
+            trip_episode(series_id);
+            Err(ApiError::Business {
+                message: "官网分集暂不可用（双路线与两种解析都未取到）".to_string(),
+                code: "SOURCE".to_string(),
+            })
+        }
+    }
 }
 
 /// `encodeURIComponent` — everything outside the unreserved set is percent-encoded
@@ -1021,7 +1248,9 @@ fn review_block(value: Option<&Value>) -> ReviewBlock {
                             avatar: item
                                 .get("user_avatar")
                                 .and_then(Value::as_str)
-                                .filter(|text| text.starts_with("http://") || text.starts_with("https://"))
+                                .filter(|text| {
+                                    text.starts_with("http://") || text.starts_with("https://")
+                                })
                                 .unwrap_or_default()
                                 .chars()
                                 .take(4096)
@@ -1033,7 +1262,8 @@ fn review_block(value: Option<&Value>) -> ReviewBlock {
                                 .chars()
                                 .take(20_000)
                                 .collect(),
-                            created_at: created.map(|value| value * if value < 1e12 { 1000.0 } else { 1.0 }),
+                            created_at: created
+                                .map(|value| value * if value < 1e12 { 1000.0 } else { 1.0 }),
                             likes: count(item.get("digg_count")),
                             rating: count(item.get("rating")),
                         }
@@ -1055,9 +1285,7 @@ pub async fn fetch_public_details(
         || series_id.len() > 30
         || (!vid.is_empty() && (!is_series_id(vid) || vid.len() > 30))
     {
-        return Err(ApiError::Input(
-            "仅支持有效的剧集和分集编号".to_string(),
-        ));
+        return Err(ApiError::Input("仅支持有效的剧集和分集编号".to_string()));
     }
     let url = if vid.is_empty() {
         format!("{SITE}/detail?series_id={series_id}")
@@ -1069,7 +1297,7 @@ pub async fn fetch_public_details(
             return Ok(details);
         }
     }
-    let html = fetch_site_html(client, &url, TIMEOUT_SECS).await?;
+    let html = fetch_site_html(client, &url, TIMEOUT_SECS, super::FetchKind::Site).await?;
     let details = parse_public_details(&html, series_id, vid, &url)?;
     if let Ok(value) = serde_json::to_value(&details) {
         store(&url, &value);
@@ -1113,10 +1341,19 @@ pub fn parse_public_details(
         like_count: count(social.get("series_like_count")),
         favorite_count: count(social.get("series_favorite_count")),
         reviews: review_block(social.get("reviews")),
-        episode_reviews: (!vid.is_empty())
-            .then(|| review_block(data.get("episodeSocialInfo").and_then(|info| info.get("reviews")))),
+        episode_reviews: (!vid.is_empty()).then(|| {
+            review_block(
+                data.get("episodeSocialInfo")
+                    .and_then(|info| info.get("reviews")),
+            )
+        }),
         episode_like_count: (!vid.is_empty())
-            .then(|| count(data.get("episodeSocialInfo").and_then(|info| info.get("episode_like_count"))))
+            .then(|| {
+                count(
+                    data.get("episodeSocialInfo")
+                        .and_then(|info| info.get("episode_like_count")),
+                )
+            })
             .flatten(),
         source_url: source_url.to_string(),
     })
@@ -1148,13 +1385,14 @@ pub async fn fetch_public_play_url(
 
     let mut last_error: Option<ApiError> = None;
     for url in candidates {
-        let html = match fetch_site_html(client, &url, PLAY_TIMEOUT_SECS).await {
-            Ok(html) => html,
-            Err(error) => {
-                last_error = Some(error);
-                continue;
-            }
-        };
+        let html =
+            match fetch_site_html(client, &url, PLAY_TIMEOUT_SECS, super::FetchKind::Site).await {
+                Ok(html) => html,
+                Err(error) => {
+                    last_error = Some(error);
+                    continue;
+                }
+            };
         let router = match read_router_data(&html) {
             Ok(router) => router,
             Err(error) => {
@@ -1171,7 +1409,8 @@ pub async fn fetch_public_play_url(
             continue;
         };
         let actual_sid = trimmed(data.get("series_id"));
-        let bound = data.get("seriesDetail")
+        let bound = data
+            .get("seriesDetail")
             .map(|detail| trimmed(detail.get("series_id")) == actual_sid)
             .unwrap_or(false);
         if !is_digits(&actual_sid)
@@ -1179,7 +1418,10 @@ pub async fn fetch_public_play_url(
             || trimmed(data.get("vid")) != vid
             || (!series_id.is_empty() && actual_sid != series_id)
             || !bound
-            || data.get("publicVideoSeo").map(|seo| seo["available"].as_bool() == Some(true)) != Some(true)
+            || data
+                .get("publicVideoSeo")
+                .map(|seo| seo["available"].as_bool() == Some(true))
+                != Some(true)
             || trimmed(data.get("publicVideoSeo").map(|seo| &seo["itemId"])) != vid
             || trimmed(data.get("publicVideoSeo").map(|seo| &seo["seriesId"])) != actual_sid
         {
@@ -1315,7 +1557,10 @@ pub async fn search_web(
         return Err(ApiError::Input("请输入 1 至 200 字的搜索词".to_string()));
     }
     let page = page.clamp(1, 50);
-    let url = format!("{SEARCH_ENDPOINT}?aid=8662&query={}&page={page}", encode_uri_component(&keyword));
+    let url = format!(
+        "{SEARCH_ENDPOINT}?aid=8662&query={}&page={page}",
+        encode_uri_component(&keyword)
+    );
     if let Some(value) = cached(&url, SEARCH_CACHE) {
         if let Ok(result) = serde_json::from_value::<super::app_search::SearchResult>(value) {
             return Ok(result);
@@ -1331,14 +1576,33 @@ pub async fn search_web(
     let mut attempt = 0;
     let payload = loop {
         let deadline = Deadline::after(TIMEOUT_SECS);
-        match super::fetch_text(client, &url, &headers, deadline, MAX_PAGE_BYTES).await {
+        match super::fetch_text(
+            client,
+            &url,
+            &headers,
+            super::FetchKind::Site,
+            deadline,
+            MAX_PAGE_BYTES,
+        )
+        .await
+        {
             Ok(text) => match serde_json::from_str::<Value>(&text) {
                 Ok(payload) => {
                     if payload.get("code").and_then(Value::as_str).is_some() {
-                        let message = payload.get("message").and_then(Value::as_str).unwrap_or_default();
-                        let code = payload.get("code").and_then(Value::as_str).unwrap_or_default();
+                        let message = payload
+                            .get("message")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default();
+                        let code = payload
+                            .get("code")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default();
                         return Err(ApiError::Business {
-                            message: format!("搜索服务暂不可用（{}{}）", if message.is_empty() { "" } else { message }, if message.is_empty() { code } else { "" }),
+                            message: format!(
+                                "搜索服务暂不可用（{}{}）",
+                                if message.is_empty() { "" } else { message },
+                                if message.is_empty() { code } else { "" }
+                            ),
                             code: "SEARCH_UPSTREAM".to_string(),
                         });
                     }
@@ -1346,20 +1610,30 @@ pub async fn search_web(
                 }
                 // The endpoint answered with HTML, which means it changed or is
                 // serving an interstitial.
-                Err(_) => return Err(ApiError::Business {
-                    message: "搜索返回了网页内容".to_string(),
-                    code: "SEARCH_FORMAT".to_string(),
-                }),
+                Err(_) => {
+                    return Err(ApiError::Business {
+                        message: "搜索返回了网页内容".to_string(),
+                        code: "SEARCH_FORMAT".to_string(),
+                    });
+                }
             },
-            Err(error) if attempt < 1 && matches!(error, ApiError::Timeout | ApiError::Network(_)) => {
+            Err(error)
+                if attempt < 1 && matches!(error, ApiError::Timeout | ApiError::Network(_)) =>
+            {
                 attempt += 1;
                 tokio::time::sleep(Duration::from_millis(400)).await;
             }
             Err(ApiError::Business { message, code }) if code == "SOURCE" => {
-                let status = message.chars().filter(|ch| ch.is_ascii_digit()).collect::<String>();
+                let status = message
+                    .chars()
+                    .filter(|ch| ch.is_ascii_digit())
+                    .collect::<String>();
                 // 4xx means the interface moved; anything else is upstream.
                 return Err(if status.starts_with('4') {
-                    ApiError::Business { message: format!("搜索接口已变化（HTTP {status}）"), code: "SEARCH_FORMAT".to_string() }
+                    ApiError::Business {
+                        message: format!("搜索接口已变化（HTTP {status}）"),
+                        code: "SEARCH_FORMAT".to_string(),
+                    }
                 } else {
                     ApiError::Business { message, code }
                 });
@@ -1404,7 +1678,10 @@ pub fn parse_search_response(
         // Some results keep the series id in `item.keyword` with an empty
         // `video_data`; that is a match, not a parse failure.
         let video_data = item.get("video_data").filter(|value| {
-            value.as_object().map(|rows| !rows.is_empty()).unwrap_or(false)
+            value
+                .as_object()
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false)
         });
         let video = video_data.unwrap_or(item);
         let series_id = [
@@ -1428,18 +1705,18 @@ pub fn parse_search_response(
         .map(|value| clean_text(Some(value)))
         .find(|value| !value.is_empty())
         .unwrap_or_default();
-        if !is_series_id(&series_id) || series_id.len() > 30 || title.is_empty() || seen.contains(&series_id) {
+        if !is_series_id(&series_id)
+            || series_id.len() > 30
+            || title.is_empty()
+            || seen.contains(&series_id)
+        {
             continue;
         }
         seen.push(series_id.clone());
         results.push(super::SeriesCard {
             series_id: series_id.clone(),
             series_title: title,
-            cover: safe_cover(
-                video
-                    .get("series_cover")
-                    .or_else(|| video.get("cover")),
-            ),
+            cover: safe_cover(video.get("series_cover").or_else(|| video.get("cover"))),
             episode_count: episode_count_of(video),
             tags: tags_of(video),
             url: format!("{SITE}/detail?series_id={series_id}"),
@@ -1497,8 +1774,7 @@ fn safe_cover(value: Option<&Value>) -> String {
         Some(other) if !other.is_null() => other.to_string(),
         _ => String::new(),
     };
-    let cleaned = replace_ignore_case(&raw, "\\u002f", "/")
-        .replace("\\/", "/");
+    let cleaned = replace_ignore_case(&raw, "\\u002f", "/").replace("\\/", "/");
     let cleaned = replace_ignore_case(&cleaned, "\\u0026", "&").replace("&amp;", "&");
     let cleaned = cleaned.trim().to_string();
     let lower = cleaned.to_ascii_lowercase();
@@ -1562,7 +1838,11 @@ fn episode_count_of(video: &Value) -> u32 {
         }
         // `/(\d+)\s*集/` — the first run followed by 集 wins.
         if chars.get(cursor) == Some(&'集') {
-            return chars[start..cursor].iter().collect::<String>().parse().unwrap_or(0);
+            return chars[start..cursor]
+                .iter()
+                .collect::<String>()
+                .parse()
+                .unwrap_or(0);
         }
     }
     0
@@ -1628,13 +1908,17 @@ mod tests {
                 }
             }
         }));
-        let catalog = parse_catalog(&html, "video", 1, "https://hongguoduanju.com/category").unwrap();
+        let catalog =
+            parse_catalog(&html, "video", 1, "https://hongguoduanju.com/category").unwrap();
         assert_eq!(catalog.results.len(), 1);
         let card = &catalog.results[0];
         assert_eq!(card.series_title, "心动信号");
         assert_eq!(card.episode_count, 62);
         assert_eq!(card.tags, vec!["都市".to_string(), "爱情".to_string()]);
-        assert_eq!(card.url, "https://hongguoduanju.com/detail?series_id=7300000000000000000");
+        assert_eq!(
+            card.url,
+            "https://hongguoduanju.com/detail?series_id=7300000000000000000"
+        );
         assert_eq!(card.metadata.episode_label, "全62集");
         assert_eq!(card.metadata.completion_status, "completed");
         assert_eq!(catalog.page, 3);
@@ -1657,7 +1941,9 @@ mod tests {
 
     #[test]
     fn comics_are_reported_as_unsupported_not_empty() {
-        let html = page(json!({ "loaderData": { "c/page": { "categoryRoute": { "contentType": "comic" }, "seo": { "title": "漫画" } } } }));
+        let html = page(
+            json!({ "loaderData": { "c/page": { "categoryRoute": { "contentType": "comic" }, "seo": { "title": "漫画" } } } }),
+        );
         let catalog = parse_catalog(&html, "comic", 4, "https://hongguoduanju.com/comic").unwrap();
         assert!(catalog.results.is_empty());
         assert_eq!(catalog.page, 1);
@@ -1687,7 +1973,13 @@ mod tests {
         assert_eq!(result.total_pages, 4);
         assert!(result.has_more);
         assert_eq!(result.channel, "web");
-        assert!(parse_search_response(&json!({ "searchList": [{ "video_data": { "series_id": "x" } }] }), 1).is_err());
+        assert!(
+            parse_search_response(
+                &json!({ "searchList": [{ "video_data": { "series_id": "x" } }] }),
+                1
+            )
+            .is_err()
+        );
         assert!(parse_search_response(&Value::Null, 1).is_err());
     }
 
@@ -1716,7 +2008,10 @@ mod tests {
         assert_eq!(details.rating, Some(9.2));
         assert_eq!(details.reviews.total, Some(2.0));
         assert_eq!(details.reviews.items.len(), 1);
-        assert_eq!(details.reviews.items[0].created_at, Some(1_700_000_000_000.0));
+        assert_eq!(
+            details.reviews.items[0].created_at,
+            Some(1_700_000_000_000.0)
+        );
         assert_eq!(details.metadata.completion_status, "ongoing");
         assert_eq!(details.metadata.published_at, Some(1_700_000_000_000));
         let episode = details.episode_reviews.unwrap();
@@ -1725,9 +2020,11 @@ mod tests {
 
         // A page for a different episode is refused rather than replayed.
         let other = html.replace("7400000000000000001", "7400000000000000009");
-        assert!(parse_public_details(&other, "7300000000000000001", "7400000000000000001", "x")
-            .unwrap_err()
-            .to_string()
-            .contains("分集不匹配"));
+        assert!(
+            parse_public_details(&other, "7300000000000000001", "7400000000000000001", "x")
+                .unwrap_err()
+                .to_string()
+                .contains("分集不匹配")
+        );
     }
 }

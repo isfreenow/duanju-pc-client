@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { searchSeries, type SearchResult, type SeriesCard } from "../ipc/client";
 import { SeriesGrid, Skeleton, Status } from "../components/Cards";
+import { cacheGet, cacheSet } from "../sessionCache";
 
 /** 河马暂不支持付费播放，搜索结果不透出；系列编号以 `hema:` 开头自解释来源。 */
 const isHemaCard = (card: SeriesCard) => card.seriesId.startsWith("hema:");
@@ -85,14 +86,27 @@ export function SearchView({
   }, []);
 
   // 取第一页：换关键词或换页签时整块重取，已追加的后面页丢弃。
+  // 同关键词同页签重新进来时先画会话缓存里的上一份（不闪骨架屏），后台静默重取；
+  // 重取失败也留着那份，只把错误标在上方。
   const loadFirst = useCallback(() => {
     if (keyword.trim() === "") return;
+    const cacheKey = `search:${category}:${keyword.trim()}:1`;
     setLoading(true);
     setError(null);
     setMoreError(null);
-    setItems([]);
-    setHead(null);
-    setHasMore(true);
+    const seeded = cacheGet<SearchResult>(cacheKey);
+    if (seeded === undefined) {
+      setItems([]);
+      setHead(null);
+      setHasMore(true);
+    } else {
+      const visible = seeded.results.filter((card) => !isHemaCard(card));
+      setHead(seeded);
+      setItems(visible);
+      loadedIds.current = new Set(visible.map((card) => card.seriesId));
+      nextPage.current = seeded.page + 1;
+      setHasMore(seeded.hasMore && visible.length > 0);
+    }
     searchSeries(keyword, 1, undefined, category)
       .then((result) => {
         if (!mounted.current) return;
@@ -103,6 +117,7 @@ export function SearchView({
         nextPage.current = result.page + 1;
         setHasMore(result.hasMore && visible.length > 0);
         setLoading(false);
+        cacheSet(cacheKey, result);
         if (autoPick.current && visible.length > 0) {
           autoPick.current = false;
           pickRef.current(bestMatch(visible, keyword));
@@ -112,6 +127,7 @@ export function SearchView({
         if (!mounted.current) return;
         setError(rejected instanceof Error ? rejected.message : String(rejected));
         setLoading(false);
+        // 画过缓存的那一份不清掉：失败只是没刷到新结果，不是把已有结果抹掉的理由。
       });
   }, [keyword, category]);
 

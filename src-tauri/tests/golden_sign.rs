@@ -12,15 +12,15 @@
 use serde_json::Value;
 
 use hongguo_desktop_client_lib::core::bits::reverse_bits;
-use hongguo_desktop_client_lib::core::f13::{get_iv, sum_md5};
 use hongguo_desktop_client_lib::core::device::{
-    signed_search_request, signed_video_request, SearchCursor,
+    SearchCursor, signed_search_request, signed_video_request,
 };
 use hongguo_desktop_client_lib::core::f13::{branch_of, hash_f13};
+use hongguo_desktop_client_lib::core::f13::{get_iv, sum_md5};
 use hongguo_desktop_client_lib::core::gorgon::x_gorgon;
 use hongguo_desktop_client_lib::core::helios::helios;
 use hongguo_desktop_client_lib::core::medusa::{
-    device_proto, key_hash, xmxor, AesV3, SignIdentity,
+    AesV3, SignIdentity, device_proto, key_hash, xmxor,
 };
 use hongguo_desktop_client_lib::core::query::python_url_encode;
 use hongguo_desktop_client_lib::core::rand::SignRng;
@@ -58,7 +58,10 @@ fn fixed_now_ms() -> i64 {
 }
 
 fn process_nonce() -> String {
-    vectors()["meta"]["process_nonce"].as_str().unwrap().to_string()
+    vectors()["meta"]["process_nonce"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 fn process_started() -> i64 {
@@ -156,8 +159,8 @@ fn gorgon_matches_the_reference() {
 #[test]
 fn branch_selection_matches_the_reference() {
     for vector in group("branchOf") {
-        let body = (vector["label"].as_str().unwrap() == "md5-body")
-            .then(|| br#"{"a":1}"#.to_vec());
+        let body =
+            (vector["label"].as_str().unwrap() == "md5-body").then(|| br#"{"a":1}"#.to_vec());
         let branch = branch_of(
             vector["url"].as_str().unwrap(),
             body.as_deref(),
@@ -190,7 +193,10 @@ fn hash_f13_matches_both_reachable_branches() {
 fn aes_v3_matches_the_reference_for_every_word_size() {
     for vector in group("aesV3") {
         let data = unhex(vector["data"].as_str().unwrap());
-        let aes = AesV3::new(&unhex(vector["key"].as_str().unwrap()), vector["khronos"].as_u64().unwrap() as u32);
+        let aes = AesV3::new(
+            &unhex(vector["key"].as_str().unwrap()),
+            vector["khronos"].as_u64().unwrap() as u32,
+        );
         assert_eq!(
             hex_bytes(&aes.block(&data[..16])),
             vector["block"].as_str().unwrap(),
@@ -242,7 +248,9 @@ fn device_proto_matches_the_reference() {
 
 fn base64_of(value: &str) -> Vec<u8> {
     use base64::Engine;
-    base64::engine::general_purpose::STANDARD.decode(value).unwrap()
+    base64::engine::general_purpose::STANDARD
+        .decode(value)
+        .unwrap()
 }
 
 #[test]
@@ -256,9 +264,7 @@ fn medusa_matches_the_reference() {
         let device_id = rng.local_id();
         assert_eq!(iid, vector["device_iid"].as_str().unwrap());
         assert_eq!(device_id, vector["device_device_id"].as_str().unwrap());
-        let body = vector["body"]
-            .as_str()
-            .map(base64_of);
+        let body = vector["body"].as_str().map(base64_of);
         let identity = SignIdentity {
             iid,
             device_id,
@@ -305,8 +311,7 @@ fn spade_key_derivation_and_url_decryption_match_the_reference() {
     }
     for vector in group("spadeUrl") {
         let seed = base64_of(vector["seed"].as_str().unwrap());
-        let plaintext =
-            decrypt_spade_url(vector["ciphertext"].as_str().unwrap(), &seed).unwrap();
+        let plaintext = decrypt_spade_url(vector["ciphertext"].as_str().unwrap(), &seed).unwrap();
         assert_eq!(plaintext, vector["plaintext"].as_str().unwrap());
         assert_eq!(plaintext, vector["decrypted"].as_str().unwrap());
     }
@@ -347,14 +352,18 @@ fn signed_search_request_matches_the_reference() {
     for vector in group("signedSearchRequest") {
         let rng = replay(&vector);
         let cursor = vector["cursor"].as_object().map(|value| SearchCursor {
-            search_id: value.get("search_id").and_then(|v| v.as_str()).map(str::to_string),
-            passback: value.get("passback").and_then(|v| v.as_str()).map(str::to_string),
-            next_offset: value
-                .get("next_offset")
-                .map(|v| match v {
-                    Value::String(text) => text.to_string(),
-                    other => other.to_string(),
-                }),
+            search_id: value
+                .get("search_id")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+            passback: value
+                .get("passback")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+            next_offset: value.get("next_offset").map(|v| match v {
+                Value::String(text) => text.to_string(),
+                other => other.to_string(),
+            }),
         });
         let request = signed_search_request(
             vector["keyword"].as_str().unwrap(),
@@ -395,10 +404,7 @@ fn bit_helpers_match_the_reference() {
             get_iv(0, &data),
             vector["getIv_zero"].as_u64().unwrap() as u32
         );
-        assert_eq!(
-            sum_md5(&data),
-            vector["sumMd5"].as_u64().unwrap() as u32
-        );
+        assert_eq!(sum_md5(&data), vector["sumMd5"].as_u64().unwrap() as u32);
         let expected = vector["reverseBits"].as_array().unwrap();
         for (i, want) in expected.iter().enumerate() {
             assert_eq!(reverse_bits(data[i]), want.as_u64().unwrap() as u8);

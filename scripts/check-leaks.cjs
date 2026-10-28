@@ -39,6 +39,14 @@ const RULES = [
  */
 const IGNORE_LINES = [/^\s*(\*|\/\/)\s/, /^\s*\/\*/];
 
+/**
+ * 本项目自己拥有或运营的公开链接：官网、issue 页、微软商店的 HEVC 扩展、统计 loader。
+ * 「硬编码来源」这条规则要拦的是把红果内容从哪拉这件事透到前端；这些链接是
+ * UI 文案与外部商店入口，不泄露任何协议细节，所以按(origin 粒度)放行。
+ */
+const ALLOWED_URLS =
+  /(duanju\.isfreenow\.com|github\.com\/isfreenow\/duanju-pc-client|apps\.microsoft\.com\/detail|data\.autolinks\.site)/i;
+
 function* walk(entry) {
   const stat = fs.statSync(entry);
   if (stat.isDirectory()) {
@@ -60,9 +68,14 @@ for (const target of targets) {
     lines.forEach((line, index) => {
       if (IGNORE_LINES.some((pattern) => pattern.test(line))) return;
       for (const [label, pattern] of RULES) {
-        if (pattern.test(line)) {
-          findings.push(`${path.relative(root, file)}:${index + 1}  ${label}  ${line.trim()}`);
+        if (!pattern.test(line)) continue;
+        // 只对「硬编码来源」开口子：命中的链接全部属于自家 origin 才算豁免，
+        // 一行里混进任何别的 http(s) 地址仍照常报。其余规则零容忍。
+        if (label === "硬编码来源") {
+          const urls = line.match(/https?:\/\/\S+/g) ?? [];
+          if (urls.length > 0 && urls.every((url) => ALLOWED_URLS.test(url))) continue;
         }
+        findings.push(`${path.relative(root, file)}:${index + 1}  ${label}  ${line.trim()}`);
       }
     });
   }

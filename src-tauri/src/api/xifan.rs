@@ -43,16 +43,19 @@ const BROWSER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 fn is_opaque_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 200
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }
 
 /// `parseId` — `xifan:<source>:<duanjuId>`（剧集）或再加 `:<episodeId>`（分集）。
 fn parse_id(value: &str, episode: bool) -> ApiResult<(String, String, Option<String>)> {
     let parts: Vec<&str> = value.split(':').collect();
     let expected = if episode { 4 } else { 3 };
-    if parts.len() != expected || parts[0] != "xifan" || !parts[1..].iter().copied().all(is_opaque_id) {
+    if parts.len() != expected
+        || parts[0] != "xifan"
+        || !parts[1..].iter().copied().all(is_opaque_id)
+    {
         return Err(ApiError::Input("西饭剧集编号无效".to_string()));
     }
     Ok((
@@ -115,7 +118,8 @@ async fn request(
     query.push(("androidVersionCode", ANDROID_VERSION_CODE.to_string()));
 
     let mut base = checked_url(&format!("{API}{path}"), API_HOSTS)?;
-    base.query_pairs_mut().extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
+    base.query_pairs_mut()
+        .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
     let url = base.to_string();
 
     let remaining = deadline.remaining().ok_or(ApiError::Timeout)?;
@@ -143,8 +147,7 @@ async fn request(
     if bytes.len() > MAX_BODY_BYTES {
         return Err(ApiError::Input("西饭返回内容过大，请稍后重试".to_string()));
     }
-    let payload: Value =
-        serde_json::from_slice(&bytes).map_err(|_| ApiError::InvalidResponse)?;
+    let payload: Value = serde_json::from_slice(&bytes).map_err(|_| ApiError::InvalidResponse)?;
     if payload.get("ret").and_then(Value::as_i64) != Some(0) {
         return Err(ApiError::InvalidResponse);
     }
@@ -183,7 +186,10 @@ fn genre_cache() -> &'static Mutex<Option<(Instant, Vec<(Genre, u64, u32)>)>> {
 }
 
 /// 题材除了 slug 还要带接口认的 `categoryId` 与 `version`。
-async fn genres(client: &reqwest::Client, force_refresh: bool) -> ApiResult<Vec<(Genre, u64, u32)>> {
+async fn genres(
+    client: &reqwest::Client,
+    force_refresh: bool,
+) -> ApiResult<Vec<(Genre, u64, u32)>> {
     if !force_refresh {
         if let Some(guard) = genre_cache().lock().ok() {
             if let Some((created, items)) = guard.as_ref() {
@@ -285,7 +291,8 @@ fn normalize_cards(result: &Value, page: u32, items: &[(Genre, u64, u32)]) -> Ca
             })
         })
         .collect();
-    let has_more = result.get("hasMore").and_then(Value::as_bool) == Some(true) && !results.is_empty();
+    let has_more =
+        result.get("hasMore").and_then(Value::as_bool) == Some(true) && !results.is_empty();
     CatalogPage {
         results,
         page,
@@ -390,7 +397,10 @@ async fn detail(client: &reqwest::Client, source: &str, duanju_id: &str) -> ApiR
     let result = request(client, "/xifan/drama/getDuanjuInfo", &params, deadline).await?;
     if trimmed(result.get("source")) != source
         || trimmed(result.get("duanjuId")) != duanju_id
-        || result.get("episodeList").and_then(Value::as_array).is_none()
+        || result
+            .get("episodeList")
+            .and_then(Value::as_array)
+            .is_none()
     {
         return Err(ApiError::Input("西饭返回的剧集与请求不一致".to_string()));
     }
@@ -518,7 +528,11 @@ pub async fn play_source(
     // 接口在分集行里就写了分辨率，直接拿来标质量。
     let width = as_u64(episode.get("videoWidth")).unwrap_or(0) as u32;
     let height = as_u64(episode.get("videoHeight")).unwrap_or(0) as u32;
-    let quality = if height > 0 { format!("{height}p") } else { String::new() };
+    let quality = if height > 0 {
+        format!("{height}p")
+    } else {
+        String::new()
+    };
     Ok(PlainSource {
         url,
         quality,
@@ -535,7 +549,10 @@ mod tests {
     #[test]
     fn ids_carry_the_source_and_the_show() {
         let (source, duanju, episode) = parse_id("xifan:jiuzhou:23280:1339243", true).unwrap();
-        assert_eq!((source.as_str(), duanju.as_str(), episode.as_deref()), ("jiuzhou", "23280", Some("1339243")));
+        assert_eq!(
+            (source.as_str(), duanju.as_str(), episode.as_deref()),
+            ("jiuzhou", "23280", Some("1339243"))
+        );
         assert!(parse_id("xifan:jiuzhou:23280", true).is_err());
         assert!(parse_id("xifan:jiuzhou:23280:1:2", true).is_err());
         assert!(parse_id("hema:jiuzhou:23280", false).is_err());
@@ -555,10 +572,15 @@ mod tests {
     fn only_clean_https_urls_survive() {
         let value = |text: &str| Value::String(text.to_string());
         assert_eq!(
-            public_https_url(Some(&value("https://dj.youlishipin.com/duanju/video302?a=1"))),
+            public_https_url(Some(&value(
+                "https://dj.youlishipin.com/duanju/video302?a=1"
+            ))),
             "https://dj.youlishipin.com/duanju/video302?a=1"
         );
-        assert_eq!(public_https_url(Some(&value("http://dj.youlishipin.com/a"))), "");
+        assert_eq!(
+            public_https_url(Some(&value("http://dj.youlishipin.com/a"))),
+            ""
+        );
         assert_eq!(public_https_url(Some(&value("https://10.0.0.9/a.mp4"))), "");
         assert_eq!(public_https_url(None), "");
     }

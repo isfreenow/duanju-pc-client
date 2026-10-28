@@ -19,10 +19,19 @@ description: 在本地短剧桌面客户端（红果/西饭短剧）里搜索剧
 4. 用户回序号 → 取那一行的 ID：`& $APP --series 7671966197985856536`
 5. 用户一上来就给了剧名、没要列表 → 跳过第 2 步直接 `& $APP --watch 剧名`
 
-下面后两条是仓库内的相对路径（在本仓库里用），装好之后只留第一条：
+打包后的产品名是中文（短剧随心看），exe 文件名由 bundler 从产品名推导、不保证稳定，
+所以安装版优先读 NSIS 写进注册表卸载项的 InstallLocation（产品名与 exe 名都无需知道），
+命中不到再回退旧的英文名安装。下面后两条是仓库内的相对路径（在本仓库里用）：
 
 ```powershell
+$reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.administrator.hongguo-desktop-client',
+  'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.administrator.hongguo-desktop-client'
+$installed = ''
+foreach ($k in $reg) { if (-not $installed -and (Test-Path $k)) {
+  $installed = (Get-ItemProperty $k).InstallLocation } }
 $APP = @($env:DUANJU_EXE,
+  $(if ($installed) { (Get-ChildItem $installed -Filter *.exe -File |
+      Where-Object { $_.Name -ne 'uninstall.exe' } | Select-Object -First 1).FullName }),
   "$env:LOCALAPPDATA\hongguo-desktop-client\hongguo-desktop-client.exe",
   "src-tauri\target\release\hongguo-desktop-client.exe",
   "src-tauri\target\debug\hongguo-desktop-client.exe") |

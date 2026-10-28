@@ -11,9 +11,12 @@
  *   ?updatebar=idle|download|install|force 时铺假数据预览各状态，仅 DEV 生效。
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "./components/Toast";
 
 /** 下载 / 安装所处的阶段，状态栏与弹框按它切换文案和进度条。 */
@@ -61,6 +64,11 @@ function mockUpdate(forced: boolean): Update {
     } as unknown as Update;
 }
 
+/** 把托盘角标的红点状态同步给 Rust；dev / 非桌面端命令不可用时静默失败。 */
+function setTrayBadge(on: boolean, version?: string) {
+    void invoke("set_tray_badge", { on, version: version ?? null }).catch(() => undefined);
+}
+
 export function UpdateBar() {
     const [update, setUpdate] = useState<Update | null>(null);
     const [checked, setChecked] = useState(false);
@@ -68,6 +76,8 @@ export function UpdateBar() {
     const [checking, setChecking] = useState(false);
     const [got, setGot] = useState(0);
     const [total, setTotal] = useState<number | undefined>(undefined);
+    // 事件回调里要用到的最新值的镜像：监听只建一次，读 ref 才不会被旧 state 坑到。
+    const stateRef = useRef({ update: null as Update | null, busy: false, checking: false });
 
     /** dev 预览假下载：按固定总量每隔 220ms 递增，走到头转「安装并重启」。 */
     const simulate = () => {
@@ -110,6 +120,7 @@ export function UpdateBar() {
                 if (!alive) return;
                 setUpdate(found);
                 setChecked(true);
+                setTrayBadge(found !== null, found?.version);
             })
             .catch(() => {
                 if (alive) setChecked(true);
@@ -121,6 +132,7 @@ export function UpdateBar() {
 
     const forced = update !== null && isForced(update);
     const busy = phase === "downloading" || phase === "installing";
+    stateRef.current = { update, busy, checking };
     // 状态栏三态：默认绿（已最新）、普通更新橙、强制更新红。
     const state = forced ? "state-force" : update !== null ? "state-update" : "state-ok";
 
@@ -149,6 +161,25 @@ export function UpdateBar() {
         }
     };
 
+    /** 针对指定的 update 走下载→安装→重启；与 install() 同一条流程，只是不从 state 取值（供托盘事件用）。 */
+    const installWith = async (target: Update) => {
+        setPhase("downloading");
+        setGot(0);
+        setTotal(undefined);
+        try {
+            await target.downloadAndInstall((event) => {
+                if (event.event === "Started") setTotal(event.data.contentLength);
+                else if (event.event === "Progress") setGot((previous) => previous + event.data.chunkLength);
+                else if (event.event === "Finished") setPhase("installing");
+            });
+            setPhase("installing");
+            await relaunch();
+        } catch {
+            setPhase("error");
+            toast("更新安装失败，可稍后重试");
+        }
+    };
+
     /** 手动再查一次：结果覆盖现有 update 状态；无新版则回落到「已是最新版本」。 */
     const recheck = async () => {
         if (checking || busy) return;
@@ -162,6 +193,7 @@ export function UpdateBar() {
             setUpdate(found);
             setPhase("idle");
             setChecked(true);
+            setTrayBadge(found !== null, found?.version);
             if (!found) toast("已是最新版本");
         } catch {
             toast("检查更新失败，请稍后重试");
@@ -169,6 +201,59 @@ export function UpdateBar() {
             setChecking(false);
         }
     };
+
+    // 托盘右键「更新程序」：Rust 侧发 tray-update 事件并拉起窗口，这里接住——
+    // 先检查，发现新版就直接开始下载安装（点击本身即授权）；dev 下只弹提示。
+    useEffect(() => {
+        let alive = true;
+        const unlisten = listen("tray-update", async () => {
+            if (!alive) return;
+            if (preview) {
+                simulate();
+                return;
+            }
+            const { update: current, busy: isBusy, checking: isChecking } = stateRef.current;
+            if (isBusy || isChecking) return;
+            if (import.meta.env.DEV) {
+                toast("开发构建跳过更新检查");
+                return;
+            }
+            if (current !== null) {
+                // 手里已有待装的新版：不重复检查，直接装。
+                await installWith(current);
+                return;
+            }
+            try {
+                const found = await check();
+                if (!alive) return;
+                setUpdate(found);
+                setChecked(true);
+                setTrayBadge(found !== null, found?.version);
+                if (found) await installWith(found);
+                else toast("已是最新版本");
+            } catch {
+                if (alive) toast("检查更新失败，请稍后重试");
+            }
+        });
+        return () => {
+            alive = false;
+            void unlisten.then((fn) => fn());
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // 后台定时巡检发现新版（Rust 侧已把托盘红点点上）：窗口开着时状态栏也同步亮起来。
+    useEffect(() => {
+        let alive = true;
+        const unlisten = listen("update-available", () => {
+            if (alive && !import.meta.env.DEV) void recheck();
+        });
+        return () => {
+            alive = false;
+            void unlisten.then((fn) => fn());
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const pct = phase === "installing"
         ? 100
@@ -197,23 +282,35 @@ export function UpdateBar() {
         <>
             <div className={"status-bar " + state} role="status" aria-live="polite">
                 <span className="status-dot" aria-hidden="true" />
-                <span className="status-brand">短剧随心看</span>
-                <span className="status-ver">v{__APP_VERSION__}</span>
-                <span className="status-spacer" />
-                {busy && (
-                    <span className={barCls} aria-hidden="true">
-                        <span className="update-progress-fill" style={fillStyle} />
-                    </span>
-                )}
-                <span className="status-text">{status}</span>
-                <button type="button" className="status-check" disabled={checking || busy} onClick={() => void recheck()}>
-                    {checking ? "检查中…" : "检查更新"}
+                <button
+                    type="button"
+                    className="status-brand"
+                    title="打开官网"
+                    onClick={() => void openUrl("https://duanju.isfreenow.com").catch(() => undefined)}
+                >
+                    短剧随心看
                 </button>
-                {update !== null && !busy && (
-                    <button type="button" className="status-act" onClick={() => void install()}>
-                        {phase === "error" ? "重试" : "立即更新"}
+                <span className="status-spacer" />
+                {/* 版本簇：版本号 + 开发版标识与更新状态、检查更新融合在同一块里 */}
+                <span className="status-ver-cluster">
+                    <span className="status-ver">v{__APP_VERSION__}</span>
+                    {import.meta.env.DEV && <span className="status-env">开发版</span>}
+                    <span className="status-sep" aria-hidden="true">·</span>
+                    {busy && (
+                        <span className={barCls} aria-hidden="true">
+                            <span className="update-progress-fill" style={fillStyle} />
+                        </span>
+                    )}
+                    <span className="status-text">{status}</span>
+                    <button type="button" className="status-check" disabled={checking || busy} onClick={() => void recheck()}>
+                        {checking ? "检查中…" : "检查更新"}
                     </button>
-                )}
+                    {update !== null && !busy && (
+                        <button type="button" className="status-act" onClick={() => void install()}>
+                            {phase === "error" ? "重试" : "立即更新"}
+                        </button>
+                    )}
+                </span>
             </div>
 
             {/* 强制更新：状态栏之外再盖一层全屏锁定弹框，Esc / 点遮罩都不关，唯一出路是装新版。 */}

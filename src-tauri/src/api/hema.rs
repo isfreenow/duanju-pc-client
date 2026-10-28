@@ -99,18 +99,26 @@ fn strip_tags(value: &str) -> String {
     out.trim().to_string()
 }
 
-async fn request_html(client: &reqwest::Client, path: &str, deadline: Deadline) -> ApiResult<String> {
+async fn request_html(
+    client: &reqwest::Client,
+    path: &str,
+    deadline: Deadline,
+) -> ApiResult<String> {
     let url = checked_url(&format!("{SITE}{path}"), SITE_HOSTS)?.to_string();
     super::fetch_text(
         client,
         &url,
         &[
             ("User-Agent", BROWSER_UA),
-            ("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+            (
+                "Accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            ),
             ("pname", "www.kuaikaw.cn"),
             ("Origin", SITE),
             ("Referer", &format!("{SITE}/")),
         ],
+        super::FetchKind::Site,
         deadline,
         MAX_PAGE_BYTES,
     )
@@ -165,8 +173,7 @@ fn page_props(html: &str) -> ApiResult<Value> {
     };
     // 标签的结束 `>` 一定在 marker 之后，JSON 体在 `>` 与 `</script>` 之间。
     let body = read_json_between(html, marker).ok_or(ApiError::InvalidResponse)?;
-    let parsed: Value =
-        serde_json::from_str(body).map_err(|_| ApiError::InvalidResponse)?;
+    let parsed: Value = serde_json::from_str(body).map_err(|_| ApiError::InvalidResponse)?;
     parsed
         .get("props")
         .and_then(|props| props.get("pageProps"))
@@ -184,7 +191,10 @@ fn normalize_books(books: Option<&Value>) -> Vec<super::SeriesCard> {
     items
         .iter()
         .filter_map(|item| {
-            let book_id = item.get("bookId").map(|value| trimmed(Some(value))).unwrap_or_default();
+            let book_id = item
+                .get("bookId")
+                .map(|value| trimmed(Some(value)))
+                .unwrap_or_default();
             if !is_digits(&book_id) {
                 return None;
             }
@@ -284,10 +294,7 @@ fn parse_genres(directory: &Value) -> ApiResult<Vec<Genre>> {
         if ids.is_empty() || ids.len() > 16 || label.is_empty() {
             continue;
         }
-        let parts = ids
-            .iter()
-            .map(|id| trimmed(Some(id)))
-            .collect::<Vec<_>>();
+        let parts = ids.iter().map(|id| trimmed(Some(id))).collect::<Vec<_>>();
         if !parts.iter().all(|id| is_digits(id)) {
             continue;
         }
@@ -313,7 +320,9 @@ pub async fn browse_list(
     let page = page.max(1);
     let slug = if genre.is_empty() { "0" } else { genre };
     if !is_hema_slug(slug) {
-        return Err(ApiError::Input("河马题材或页码无效，请重新选择".to_string()));
+        return Err(ApiError::Input(
+            "河马题材或页码无效，请重新选择".to_string(),
+        ));
     }
 
     let deadline = Deadline::after(TIMEOUT_SECS);
@@ -355,7 +364,11 @@ pub async fn browse_list(
     // 参考实现会核对页面回显的页码与题材，避免拿上一页的结果当本页。
     let echoed_page = as_u64(data.get("page")).unwrap_or(0) as u32;
     let echoed_slug = trimmed(data.get("typeThreeId"));
-    let echoed_slug = if echoed_slug.is_empty() { "0" } else { &echoed_slug[..] };
+    let echoed_slug = if echoed_slug.is_empty() {
+        "0"
+    } else {
+        &echoed_slug[..]
+    };
     data.get("bookList")
         .and_then(Value::as_array)
         .ok_or(ApiError::InvalidResponse)?;
@@ -449,7 +462,11 @@ pub async fn episode_list(client: &reqwest::Client, series_id: &str) -> ApiResul
     let (book_id, _) = parse_id(series_id, false)?;
     let data = detail(client, &book_id).await?;
     let info = data.get("bookInfoVo").cloned().unwrap_or(Value::Null);
-    let chapters = data.get("chapterList").and_then(Value::as_array).cloned().unwrap_or_default();
+    let chapters = data
+        .get("chapterList")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let series_title = {
         let title = plain_text(info.get("bookName"));
         if title.is_empty() {
@@ -526,7 +543,11 @@ pub async fn public_details(client: &reqwest::Client, series_id: &str) -> ApiRes
 }
 
 /// `fetchPlayUrlSingle` — 每次现读详情，只在这集确实免费时给出明文地址。
-pub async fn play_source(client: &reqwest::Client, vid: &str, series_id: &str) -> ApiResult<PlainSource> {
+pub async fn play_source(
+    client: &reqwest::Client,
+    vid: &str,
+    series_id: &str,
+) -> ApiResult<PlainSource> {
     let (book_id, chapter_id) = parse_id(vid, true)?;
     let chapter_id = chapter_id.unwrap_or_default();
     if !series_id.is_empty() {
@@ -537,7 +558,11 @@ pub async fn play_source(client: &reqwest::Client, vid: &str, series_id: &str) -
         }
     }
     let data = detail(client, &book_id).await?;
-    let chapters = data.get("chapterList").and_then(Value::as_array).cloned().unwrap_or_default();
+    let chapters = data
+        .get("chapterList")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let chapter = chapters
         .iter()
         .find(|row| trimmed(row.get("chapterId")) == chapter_id)
@@ -606,8 +631,14 @@ mod tests {
             public_https_url(Some(&value("https://dzzt-video.cbread.cn/a.mp4"))),
             "https://dzzt-video.cbread.cn/a.mp4"
         );
-        assert_eq!(public_https_url(Some(&value("http://a.example.com/v.mp4"))), "");
-        assert_eq!(public_https_url(Some(&value("https://127.0.0.1/a.mp4"))), "");
+        assert_eq!(
+            public_https_url(Some(&value("http://a.example.com/v.mp4"))),
+            ""
+        );
+        assert_eq!(
+            public_https_url(Some(&value("https://127.0.0.1/a.mp4"))),
+            ""
+        );
         assert_eq!(
             public_https_url(Some(&value("https://user:pw@kuaikaw.cn/a.mp4"))),
             ""
@@ -643,7 +674,10 @@ mod tests {
         });
         let items = parse_genres(&directory).unwrap();
         assert_eq!(
-            items.iter().map(|genre| genre.slug.as_str()).collect::<Vec<_>>(),
+            items
+                .iter()
+                .map(|genre| genre.slug.as_str())
+                .collect::<Vec<_>>(),
             vec!["1170", "1165-1170"]
         );
         assert!(parse_genres(&serde_json::json!({})).is_err());

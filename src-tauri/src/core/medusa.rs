@@ -14,12 +14,16 @@ use super::bits::{le32, slice, varint, xor_bytes_repeating, zigzag};
 use super::f13::{hash_f13, md5_bytes, query_sm3};
 use super::rand::SignRng;
 use super::sm3::sm3;
-use super::tables::{APP_TOKEN_MD5, AES_IV, AES_KEY, SIGN_KEY, SBOX, SPADE_URL_CONSTANTS};
+use super::tables::{AES_IV, AES_KEY, APP_TOKEN_MD5, SBOX, SIGN_KEY, SPADE_URL_CONSTANTS};
 
 pub fn md5_hex_upper(data: &[u8]) -> String {
     let mut hasher = Md5::new();
     hasher.update(data);
-    hasher.finalize().iter().map(|b| format!("{b:02X}")).collect()
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02X}"))
+        .collect()
 }
 
 // ── protobuf wire writer ─────────────────────────────────────────────────
@@ -84,7 +88,10 @@ fn field(tag: u32, value: Field<'_>) -> Vec<u8> {
 
 /// `proto([[tag, value, type], ...])`
 pub fn proto(fields: Vec<(u32, Field<'_>)>) -> Vec<u8> {
-    fields.into_iter().flat_map(|(tag, value)| field(tag, value)).collect()
+    fields
+        .into_iter()
+        .flat_map(|(tag, value)| field(tag, value))
+        .collect()
 }
 
 // ── AesV3 ────────────────────────────────────────────────────────────────
@@ -92,18 +99,8 @@ pub fn proto(fields: Vec<(u32, Field<'_>)>) -> Vec<u8> {
 /// The reference assigns `this.con` but never reads it, so the table is kept
 /// for fidelity only.
 #[allow(dead_code)]
-const CON: [[usize; 4]; 4] = [
-    [1, 0, 2, 3],
-    [1, 3, 0, 2],
-    [0, 1, 3, 2],
-    [1, 0, 2, 3],
-];
-const CON2: [[usize; 4]; 4] = [
-    [1, 0, 2, 3],
-    [2, 0, 3, 1],
-    [0, 1, 3, 2],
-    [1, 0, 2, 3],
-];
+const CON: [[usize; 4]; 4] = [[1, 0, 2, 3], [1, 3, 0, 2], [0, 1, 3, 2], [1, 0, 2, 3]];
+const CON2: [[usize; 4]; 4] = [[1, 0, 2, 3], [2, 0, 3, 1], [0, 1, 3, 2], [1, 0, 2, 3]];
 const ORDER: [[usize; 16]; 4] = [
     [0, 9, 14, 11, 4, 13, 2, 7, 8, 1, 6, 15, 12, 5, 10, 3],
     [0, 9, 14, 15, 4, 13, 2, 7, 8, 1, 6, 3, 12, 5, 10, 11],
@@ -242,7 +239,12 @@ impl AesV3 {
         let old = *rows;
         let con2 = CON2[self.word_size];
         for i in 0..4 {
-            rows[i] = [old[i][con2[0]], old[i][con2[1]], old[i][con2[2]], old[i][con2[3]]];
+            rows[i] = [
+                old[i][con2[0]],
+                old[i][con2[1]],
+                old[i][con2[2]],
+                old[i][con2[3]],
+            ];
         }
     }
 
@@ -357,9 +359,8 @@ pub fn xmxor(data: &[u8], key: &[u8]) -> Vec<u8> {
     let first = encoded[0];
     encoded[0] = (!last).wrapping_add(first);
     encoded[1] = (encoded[0] ^ encoded[length - 1] ^ 254).wrapping_add(encoded[1]);
-    encoded[2] = encoded[2].wrapping_add(
-        (last.wrapping_sub(first)) ^ (rot8l(encoded[1] as u32, 3) as u8) ^ 2,
-    );
+    encoded[2] = encoded[2]
+        .wrapping_add((last.wrapping_sub(first)) ^ (rot8l(encoded[1] as u32, 3) as u8) ^ 2);
     for i in 0..length.saturating_sub(4) {
         let temp = (rot8l(encoded[i + 2] as u32, 3) as u8) ^ encoded[i + 1] ^ ((i + 3) as u8);
         encoded[i + 3] = (!temp).wrapping_add(encoded[i + 3]);
@@ -477,7 +478,11 @@ pub fn build_medusa(
         (7, Field::Sint(env_pid as i64)),
         (
             12,
-            Field::Message(device_proto(&identity.device_id, process_nonce, process_started)),
+            Field::Message(device_proto(
+                &identity.device_id,
+                process_nonce,
+                process_started,
+            )),
         ),
         (
             13,
@@ -535,7 +540,8 @@ pub fn build_medusa(
         *byte ^= seed[((!(i as i32)) & 3) as usize];
     }
 
-    let check = ((q_sm3[0] as u32 & 63) << 14) | 0x1800_0001 | ((query_body_ts[0] as u32 & 63) << 8);
+    let check =
+        ((q_sm3[0] as u32 & 63) << 14) | 0x1800_0001 | ((query_body_ts[0] as u32 & 63) << 8);
     let xm_rand = rng.next_u32();
 
     let mut packed: Vec<u8> = Vec::new();

@@ -144,6 +144,11 @@ export interface PlayResolution {
 export interface CommandError {
   code: string;
   message: string;
+  /**
+   * 失败时的「下一步动作」。只有少数几类错误带它（缺 HEVC 组件、没先看过就查
+   * 更新……）；带 hint 时界面按它给具体指引，而不是统一一句「播放出错」。
+   */
+  hint?: string;
 }
 
 /**
@@ -194,6 +199,38 @@ export function errorText(error: unknown): string {
   return JSON.stringify(error);
 }
 
+/**
+ * 失败时的「下一步动作」文案；没有就返回空串，界面回落到通用提示。
+ * 与 [`errorText`] 分开，是因为 message 归 message（是什么错了）、hint 归 hint
+ * （接下来能做什么），两者在 UI 上占不同的位置。
+ */
+export function errorHint(error: unknown): string {
+  return isCommandError(error) ? error.hint ?? "" : "";
+}
+
+/** 一条命令失败的完整描述：`message`（可能带 hint），供只有一行文案的落点用。 */
+export function errorWithHint(error: unknown): string {
+  const text = errorText(error);
+  const hint = errorHint(error);
+  return hint.length > 0 ? `${text} — ${hint}` : text;
+}
+
+/**
+ * IPC 失败的带类型版本：保留 Rust 侧的 `code` 与 `hint`，让视图能为某一类
+ * 错误定制下一步（缺 HEVC 就引导装组件、没先看过就提示先看一集），而不只是
+ * 把整条错误拼成一句文案。
+ */
+export class IpcError extends Error {
+  readonly code: string;
+  readonly hint: string;
+  constructor(code: string, message: string, hint = "") {
+    super(message);
+    this.name = "IpcError";
+    this.code = code;
+    this.hint = hint;
+  }
+}
+
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
     throw new Error("这个页面需要在桌面客户端里运行（找不到 Tauri 运行时）");
@@ -201,6 +238,7 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   try {
     return await invoke<T>(command, args);
   } catch (error) {
+    if (isCommandError(error)) throw new IpcError(error.code, error.message, error.hint ?? "");
     throw new Error(errorText(error));
   }
 }
@@ -230,8 +268,129 @@ export function getPublicDetails(seriesId: string, vid?: string): Promise<Public
   return call<PublicDetails>("get_public_details", { seriesId, vid });
 }
 
-export function resolvePlay(vid: string, seriesId?: string): Promise<PlayResolution> {
-  return call<PlayResolution>("resolve_play", { vid, seriesId });
+export function resolvePlay(vid: string, seriesId?: string, forceRefresh = false): Promise<PlayResolution> {
+  return call<PlayResolution>("resolve_play", { vid, seriesId, forceRefresh });
+}
+
+/**
+ * 后续几集的预取：提前把「签接口 + 取回源地址 + 解 spade」跑完，结果只进 Rust 的
+ * 会话缓存。返回只有条数（cached/failed）——地址不会因为「预取」多一条下发通道。
+ */
+export interface PrefetchReport {
+  cached: number;
+  failed: number;
+}
+
+export function prefetchPlay(vids: string[], seriesId?: string): Promise<PrefetchReport> {
+  return call<PrefetchReport>("prefetch_play", { vids, seriesId });
+}
+
+/** 播放器探到一条流拉不动时，告诉 Rust 别再拿这一集的缓存。 */
+export function dropPrefetch(seriesId: string, vid: string): Promise<boolean> {
+  return call<boolean>("drop_prefetch", { seriesId, vid });
+}
+
+/**
+ * 一部剧的追剧检测结果（`commands::SeriesUpdate`）：新集数 + 续作候选。
+ * `acknowledgedTotal` 是 Rust 算好的「已确认看到第几集」，前端不自推。
+ */
+export interface SequelCandidate {
+  id: string;
+  title: string;
+}
+
+export interface SeriesUpdate {
+  seriesId: string;
+  seriesTitle: string;
+  knownTotal: number;
+  acknowledgedTotal: number;
+  newEpisodes: number;
+  sequels: SequelCandidate[];
+  note?: string;
+}
+
+/** 批量检查返回的一行（`commands::UpdateSummary`）：只给角标需要的数字。 */
+export interface UpdateSummary {
+  seriesId: string;
+  knownTotal: number;
+  acknowledgedTotal: number;
+  newEpisodes: number;
+  sequels: number;
+  failed: boolean;
+}
+
+/** 检查某一部的更新（详情页/「我的」页卡片的「检查更新」）。 */
+export function checkSeriesUpdate(seriesId: string, force = false): Promise<SeriesUpdate> {
+  return call<SeriesUpdate>("check_series_update", { seriesId, force });
+}
+
+/** 用户点开看了，把角标清掉；返回清完之后的状态。 */
+export function acknowledgeSeries(seriesId: string, vidIndex?: number): Promise<ProgressRow | null> {
+  return call<ProgressRow | null>("acknowledge_series", { seriesId, vidIndex });
+}
+
+/** 批量检查更新（启动后静默刷一次角标）。 */
+export function checkUpdates(seriesIds: string[], force = false): Promise<UpdateSummary[]> {
+  return call<UpdateSummary[]>("check_updates", { seriesIds, force });
+}
+
+/**
+ * 兼容转码（HEVC → H.264）：工具「首次需要时按需下载」，随包不带。
+ * 前端只认状态与产物路径，不知道 FFmpeg 的存在。
+ */
+export interface ToolStatus {
+  available: boolean;
+  preparing: boolean;
+  lastError?: string;
+  encoder?: string;
+  outputBytes: number;
+}
+
+export interface TranscodeOutput {
+  /** 转码产物的本地文件路径（用 asset 协议喂给 `<video>`）。 */
+  path: string;
+  bytes: number;
+  encoder: string;
+  cached: boolean;
+}
+
+/** `transcode-progress` 事件的一帧（`transcode::ProgressEvent`）。 */
+export interface TranscodeProgress {
+  stage: "tool" | "input" | "encode" | string;
+  job: string;
+  percent: number;
+  doneBytes?: number;
+  totalBytes?: number;
+  note?: string;
+}
+
+export function transcodeStatus(): Promise<ToolStatus> {
+  return call<ToolStatus>("transcode_status");
+}
+
+export function prepareTranscode(job: string): Promise<ToolStatus> {
+  return call<ToolStatus>("prepare_transcode", { job });
+}
+
+export function transcodeEpisode(
+  job: string,
+  vid: string,
+  seriesId?: string,
+  quality?: string,
+): Promise<TranscodeOutput> {
+  return call<TranscodeOutput>("transcode_episode", { job, vid, seriesId, quality });
+}
+
+export function cancelTranscode(job: string): Promise<boolean> {
+  return call<boolean>("cancel_transcode", { job });
+}
+
+/** 订阅转码进度事件；返回取消订阅。纯浏览器预览下没有运行时，给一个空操作。 */
+export async function onTranscodeProgress(
+  handler: (event: TranscodeProgress) => void,
+): Promise<() => void> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return () => { };
+  return listen<TranscodeProgress>("transcode-progress", (event) => handler(event.payload));
 }
 
 /** 上报一次播放位置；Rust 侧带节流，调用方按 timeupdate 直接发就行。 */
@@ -260,6 +419,11 @@ export function latestProgress(seriesId: string): Promise<ProgressRow | null> {
 
 export function clearHistory(): Promise<void> {
   return call<void>("clear_history");
+}
+
+/** 删除某一部的观看记录（「我的」页历史卡上的 ✕）。 */
+export function removeHistory(seriesId: string): Promise<void> {
+  return call<void>("remove_history", { seriesId });
 }
 
 /**
