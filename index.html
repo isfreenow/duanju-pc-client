@@ -6,7 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>短剧随心看</title>
   <link rel="canonical" href="https://duanju.isfreenow.com/" />
-  <script async src="https://data.autolinks.site/api/loader/duanju.js"></script>
+  <!-- 统计脚本改在 main.tsx 挂载后动态注入：写在 head 的外链脚本（无论 async/defer）
+       都会让启动时序绑上公网，域名不通时表现为白屏或埋点挂起。 -->
 </head>
 
 <body>
