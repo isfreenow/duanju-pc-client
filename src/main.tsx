@@ -1,4 +1,5 @@
 import ReactDOM from "react-dom/client";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 
 /**
@@ -8,6 +9,12 @@ import App from "./App";
  * in the player rather than a dev-only artefact.
  */
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<App />);
+
+// 配置里窗口 visible:false（WebView2 子进程冷启动那段不暴露白底空窗）；
+// React 完成首帧挂载后由这里拉起窗口。事件监听类方案（tauri://ready、
+// Rust 侧 on_page_load）在本机实测都收不到，不依赖它们。
+void getCurrentWindow().show();
+void getCurrentWindow().setFocus();
 
 // 统计脚本挂载后动态注入：不占启动时序，域名不通时静默失败，不会再白屏等超时。
 const analytics = document.createElement("script");

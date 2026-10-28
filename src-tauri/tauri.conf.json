@@ -20,7 +20,9 @@
         "center": true,
         "resizable": true,
         "decorations": false,
-        "shadow": true
+        "shadow": true,
+        "visible": false,
+        "backgroundColor": "#141414ff"
       }
     ],
     "security": {
