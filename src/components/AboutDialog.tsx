@@ -70,6 +70,17 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
                     >
                         官网反馈表
                     </button>
+                    {" · "}
+                    <button
+                        type="button"
+                        className="link"
+                        title="把问题直接发邮件给我们，欢迎附上截图"
+                        onClick={() => {
+                            void openUrl("mailto:hello@isfreenow.com").catch(() => undefined);
+                        }}
+                    >
+                        发邮件 hello@isfreenow.com
+                    </button>
                 </p>
                 <button type="button" className="about-close" onClick={onClose}>
                     知道了

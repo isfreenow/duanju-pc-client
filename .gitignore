@@ -27,3 +27,6 @@ dist-ssr
 fixtures/
 .tmp-verify/
 .tmp-shot/
+
+# 发布/推荐文案批次产出，不入库
+pr/

@@ -122,6 +122,7 @@ function qualityLabel(stream: PlayableStream): string {
 
 const ISSUES_URL = "https://github.com/isfreenow/duanju-pc-client/issues";
 const FEEDBACK_URL = "https://duanju.isfreenow.com/#feedback";
+const FEEDBACK_EMAIL = "hello@isfreenow.com";
 
 /** 转码三个阶段的人话文案；界面不解释 FFmpeg，只说现在在干哪一步。 */
 function transcodeStageLabel(stage: string): string {
@@ -1185,6 +1186,10 @@ export function PlayerView({
               或到官网
               <button type="button" onClick={() => void openUrl(FEEDBACK_URL).catch(() => undefined)}>
                 填反馈表
+              </button>{" "}
+              或发邮件到
+              <button type="button" onClick={() => void openUrl(`mailto:${FEEDBACK_EMAIL}`).catch(() => undefined)}>
+                {FEEDBACK_EMAIL}
               </button>
             </Status>
           )}
@@ -1200,6 +1205,10 @@ export function PlayerView({
               ，或到官网{" "}
               <button type="button" onClick={() => void openUrl(FEEDBACK_URL).catch(() => undefined)}>
                 填反馈表
+              </button>
+              ，或发邮件到{" "}
+              <button type="button" onClick={() => void openUrl(`mailto:${FEEDBACK_EMAIL}`).catch(() => undefined)}>
+                {FEEDBACK_EMAIL}
               </button>
             </Status>
           )}

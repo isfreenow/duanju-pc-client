@@ -99,12 +99,13 @@
 3. 哪部剧、哪一集：写剧名就行，能想起第几集更好
 4. 现象：什么时候发生、屏幕上提示了什么（能截图就附一张，注意打码掉头像、账号等私人信息）
 
-**第 2 步 · 选一个最顺手的渠道（三个都行，选你不怕的那个）。**
+**第 2 步 · 选一个最顺手的渠道（四个都行，选你不怕的那个）。**
 
 - **最省事 · 交给 AI**：把第 1 步的 4 条直接发给你的 AI 助手，对它说：
   > 帮我把这个短剧软件的问题反馈提交到 Issues：<https://github.com/isfreenow/duanju-pc-client/issues>
 - **不想登 GitHub · 官网反馈表**：打开 <https://duanju.isfreenow.com/#feedback>，把第 1 步的 4 条
   填进去就行（留个邮箱/微信可选，方便我们回复你）。
+- **不想登 GitHub · 发邮件**：把第 1 步的 4 条发到 hello@isfreenow.com，截图能直接当附件带上。
 - **自己动手 · GitHub Issues**：打开 <https://github.com/isfreenow/duanju-pc-client/issues>，
   点「New issue」，标题写「现象＋剧名」（例：播放《剧名》第 3 集有声音没画面），正文贴上第 1 步的 4 条。
 
