@@ -89,7 +89,7 @@ jobs:
           # 会连带打 rpm（runner 不一定有 rpmbuild）的意外。
           # floating 是「浮动名副本」的固定文件名，让 releases/latest/download/<名字> 永久指向最新版。
           - platform: windows-latest
-            args: "--bundles nsis,msi"
+            args: "--bundles nsis"
             floating: duanju-latest-windows.exe
           - platform: ubuntu-22.04
             args: "--bundles deb"
@@ -156,9 +156,11 @@ jobs:
           releaseDraft: false
           prerelease: false
           releaseCommitish: ${{ needs.plan.outputs.commit }}
-          # Windows 同时产 nsis/msi，latest.json 只有一个 windows 槽位：取 NSIS，
-          # 它的静默升级不依赖系统代码页，比 msiexec 稳。
-          updaterJsonPreferNsis: true
+          # Windows 只产 NSIS：msiexec 在部分机器卡死在「准备安装」阶段，且 MSI 的
+          # WebView2 下载是无超时同步调用，网络差时挂住整个安装。
+          # GitHub 会剥掉附件文件名里的非 ASCII 字符（中文前缀丢失、页面靠 label 显示
+          # 中文的根因），用 ASCII pattern 让页面显示名与下载文件名保持一致。
+          releaseAssetNamePattern: duanju-[version]-[platform]-[arch][setup][ext]
           args: ${{ matrix.args }}
 
       # 把刚产出的包复制成不带版本号的固定名再传一次：带版本号的文件名没法做永久直链，
