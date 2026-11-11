@@ -10,12 +10,15 @@
 //! progressive MP4 (`moov` first) whose samples are CENC-encrypted whole, with a
 //! per-sample 16-byte IV listed in `senc`, so WebCrypto AES-CTR undoes it.
 
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::core;
 use crate::core::spade::{base64_lenient, clean_url, decrypt_spade_url, derive_content_key};
 use crate::core::tables::VIDEO_UA;
+use crate::core::SignRng;
 
 use super::{API_DOMAINS, ApiError, ApiResult, Deadline, MEDIA_DOMAINS, now_millis, request_json};
 
@@ -111,6 +114,14 @@ fn codec_rank(codec: &str) -> u8 {
 
 /// `fetchAppPlayUrl(vid)` in auto-quality mode: prefer H.264, then the largest
 /// picture. Download-oriented quality floors are out of scope for v1.
+///
+/// The legacy `multi_video_model` POST now routinely answers 200 with an empty
+/// body, so one request cannot resolve a stream. Mirroring the reference, the
+/// first attempt stays on that POST and only a clean empty response
+/// (`APP_EMPTY`) spends the single recovery attempt on the signed `video_tab`
+/// GET, whose model is nested under `data.video_model_data[vid]` and may carry
+/// an inline `video_list`. An HTTP status or business rejection is returned
+/// as-is: neither is the empty-200 signature the recovery is for.
 pub async fn fetch_app_play_url(
     client: &reqwest::Client,
     vid: &str,
@@ -135,18 +146,74 @@ pub async fn fetch_app_play_url(
     })
     .to_string();
 
-    let device = core::playback_device(client).await?;
-    let signed = core::playback_request(payload.as_bytes(), device, now_millis());
+    let mut identity = core::playback_device(client).await?.clone();
+    let process = crate::state::ProcessIdentity::current();
 
-    let response = request_json(
-        client,
-        &signed.url,
-        &signed.headers,
-        Some(signed.body.as_deref().unwrap_or_default()),
-        API_DOMAINS,
-        deadline,
-    )
-    .await?;
+    let mut response: Option<Value> = None;
+    let mut last_error: Option<ApiError> = None;
+    for attempt in 0..2u8 {
+        let signed = if attempt == 0 {
+            core::playback_request(payload.as_bytes(), &identity, now_millis())
+        } else {
+            core::video_tab_request(
+                vid,
+                &identity,
+                &SignRng::system(),
+                now_millis(),
+                &process.nonce,
+                process.started_ms,
+            )
+        };
+        let mut headers = signed.headers;
+        if attempt == 1 {
+            headers.push(("Connection".to_string(), "close".to_string()));
+        }
+        match request_json(
+            client,
+            &signed.url,
+            &headers,
+            signed.body.as_deref(),
+            API_DOMAINS,
+            deadline,
+        )
+        .await
+        {
+            Ok(body) => {
+                response = Some(body);
+                break;
+            }
+            Err(error) => {
+                let roomy = deadline
+                    .remaining()
+                    .is_some_and(|left| left >= Duration::from_millis(1000));
+                if attempt == 1 || error.code() != "APP_EMPTY" || !roomy {
+                    return Err(error);
+                }
+                last_error = Some(error);
+                // Fresh identity for the recovery route when there is budget;
+                // a failed re-registration keeps the identity we already have.
+                if deadline
+                    .remaining()
+                    .is_some_and(|left| left >= Duration::from_secs(8))
+                    && let Ok(fresh) = core::register::register_device(client).await
+                {
+                    identity = fresh;
+                }
+                if deadline
+                    .remaining()
+                    .is_some_and(|left| left < Duration::from_millis(500))
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+        }
+    }
+
+    let response = response.ok_or_else(|| last_error.unwrap_or_else(|| ApiError::Business {
+        message: "App 接口暂未提供本集播放信息".to_string(),
+        code: "BUSINESS_REJECTED".to_string(),
+    }))?;
     if rejected(&response) {
         return Err(ApiError::Business {
             message: "App 接口暂未提供本集播放信息".to_string(),
@@ -154,7 +221,13 @@ pub async fn fetch_app_play_url(
         });
     }
 
-    let entry = response.get("data").and_then(|data| data.get(vid));
+    // The video_tab route nests the model under `video_model_data`; the legacy
+    // POST keeps it directly under `data`. Prefer the nested form when present.
+    let entries = response
+        .get("data")
+        .and_then(|data| data.get("video_model_data"))
+        .or_else(|| response.get("data"));
+    let entry = entries.and_then(|items| items.get(vid));
     let model = match entry.and_then(|item| item.get("video_model")) {
         Some(Value::String(raw)) => json_body(raw),
         Some(Value::Object(_)) => entry.and_then(|item| item.get("video_model")).cloned(),
@@ -175,6 +248,38 @@ pub async fn fetch_app_play_url(
         });
     };
 
+    // An inline rendition map needs no second request; otherwise read the
+    // per-episode fallback address the model advertises.
+    let inline = model
+        .get("video_list")
+        .and_then(Value::as_object)
+        .is_some_and(|rows| !rows.is_empty());
+    if inline {
+        match build_variants(&model, vid, true) {
+            Ok(variants) => return Ok(variants),
+            Err(error) => {
+                // Only an absent rendition recovers through the fallback; a hard
+                // codec or security failure is reported as-is.
+                if error.code() != "NO_PLAYABLE_SOURCE"
+                    || model.get("fallback_api").is_none()
+                {
+                    return Err(error);
+                }
+            }
+        }
+    }
+
+    let info = read_fallback_info(client, &model, deadline).await?;
+    build_variants(&info, vid, false)
+}
+
+/// `model.fallback_api` → `video_info.data` — the rendition map behind the
+/// per-episode fallback address.
+async fn read_fallback_info(
+    client: &reqwest::Client,
+    model: &Value,
+    deadline: Deadline,
+) -> ApiResult<Value> {
     let fallback = parse_fallback(model.get("fallback_api"));
     if fallback.is_empty() {
         return Err(ApiError::Business {
@@ -202,14 +307,20 @@ pub async fn fetch_app_play_url(
             code: "BUSINESS_REJECTED".to_string(),
         });
     }
-    let Some(info) = outer.get("video_info").and_then(|value| value.get("data")) else {
-        return Err(ApiError::Business {
+    outer
+        .get("video_info")
+        .and_then(|value| value.get("data"))
+        .cloned()
+        .ok_or_else(|| ApiError::Business {
             message: "App 接口未返回本集片源模型".to_string(),
             code: "MISSING_MODEL".to_string(),
-        });
-    };
+        })
+}
 
-    // Candidate rows, keeping only codecs the reference considers playable.
+/// Turn a rendition map — the inline `model` or the fallback `video_info.data`
+/// — into the sorted candidate streams. `inline` selects the playback User-Agent
+/// the reference pairs with each route.
+fn build_variants(info: &Value, vid: &str, inline: bool) -> ApiResult<Vec<MediaVariant>> {
     let mut rows: Vec<Row> = info
         .get("video_list")
         .and_then(Value::as_object)
@@ -246,6 +357,11 @@ pub async fn fetch_app_play_url(
         .get("key_seed")
         .and_then(Value::as_str)
         .map(|value| base64_lenient(value));
+    let media_ua = if inline {
+        VIDEO_UA.replace("71332", "74332")
+    } else {
+        VIDEO_UA.to_string()
+    };
     let mut variants: Vec<MediaVariant> = Vec::new();
     let mut seen: Vec<String> = Vec::new();
     let mut last_error: Option<ApiError> = None;
@@ -303,7 +419,7 @@ pub async fn fetch_app_play_url(
                         height: selected.height,
                         source: "app".to_string(),
                         vid: vid.to_string(),
-                        user_agent: VIDEO_UA.to_string(),
+                        user_agent: media_ua.clone(),
                         referer: None,
                     });
                 }
@@ -315,7 +431,7 @@ pub async fn fetch_app_play_url(
     if variants.is_empty() {
         return Err(last_error.unwrap_or_else(|| ApiError::Business {
             message: "本集片源地址或密钥无法解析".to_string(),
-            code: "INVALID_RESPONSE".to_string(),
+            code: "NO_PLAYABLE_SOURCE".to_string(),
         }));
     }
     Ok(variants)

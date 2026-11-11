@@ -118,6 +118,132 @@ pub fn playback_request(payload: &[u8], device: &RegisteredDevice, now_ms: i64) 
     }
 }
 
+/// Signed `video_tab` model request — the recovery route the reference uses
+/// (`playbackRequest(payload, identity, vid)`) when the legacy
+/// `multi_video_model` POST answers 200 with an empty body. A bodyless GET
+/// signs sixteen zero bytes (not `MD5(empty)`), carries the `video_id` and its
+/// companion biz params in the query, rides the 7.3.9.32 profile, walks up to
+/// 128 ticket offsets for hash branch 0, and gets the full gorgon/helios/medusa
+/// suite. `from_video_id` stays in the query even though it is empty.
+pub fn video_tab_request(
+    vid: &str,
+    device: &RegisteredDevice,
+    rng: &SignRng,
+    now_ms: i64,
+    process_nonce: &str,
+    process_started: i64,
+) -> SignedRequest {
+    const VIDEO_TAB_API: &str =
+        "https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/";
+    const TAB_VERSION: &str = "73932";
+    const TAB_VERSION_NAME: &str = "7.3.9.32";
+    let overrides: [(&'static str, &str); 5] = [
+        ("version_code", TAB_VERSION),
+        ("version_name", TAB_VERSION_NAME),
+        ("manifest_version_code", TAB_VERSION),
+        ("update_version_code", TAB_VERSION),
+        ("pv_player", TAB_VERSION),
+    ];
+    let khronos = (now_ms / 1000) as u32;
+
+    // Key order is fed to the signature byte for byte, so it must mirror the
+    // reference's `{...device, ...values, ts, _rticket}` object spread: device
+    // fields (identity ids last), then the video_tab biz params, then ts and
+    // the jittered ticket.
+    let mut base: Vec<(&'static str, String)> = Vec::new();
+    for (key, default) in DEVICE_DEFAULT {
+        let value = overrides
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, value)| *value)
+            .unwrap_or(*default);
+        base.push((*key, value.to_string()));
+    }
+    base.push(("device_id", device.device_id.clone()));
+    base.push(("iid", device.iid.clone()));
+    base.push(("cdid", device.cdid.clone()));
+    for (key, value) in [
+        ("video_id", vid.to_string()),
+        ("video_id_type", "0".to_string()),
+        ("device_level", "1".to_string()),
+        ("need_all_video_definition", "1".to_string()),
+        ("need_mp4_align", "0".to_string()),
+        ("use_os_player", "0".to_string()),
+        ("video_platform", "1024".to_string()),
+        ("source", "0".to_string()),
+        ("from_video_id", String::new()),
+    ] {
+        base.push((key, value));
+    }
+
+    let mut ticket = now_ms;
+    let mut query = String::new();
+    let mut url = String::new();
+    for n in 0..128i64 {
+        ticket = now_ms + n;
+        let mut attempt = base.clone();
+        attempt.push(("ts", khronos.to_string()));
+        attempt.push(("_rticket", ticket.to_string()));
+        query = python_url_encode(&attempt);
+        url = format!("{VIDEO_TAB_API}?{query}");
+        if branch_of(&url, None, khronos) == 0 {
+            break;
+        }
+    }
+
+    let identity = SignIdentity {
+        iid: device.iid.clone(),
+        device_id: device.device_id.clone(),
+        version_code: TAB_VERSION.to_string(),
+        version_name: TAB_VERSION_NAME.to_string(),
+    };
+
+    // Header evaluation order consumes the RNG in the reference's sequence:
+    // gorgon's 16-bit draw, then Helios, then Medusa's five draws.
+    let random = rng.next_u16();
+    let headers = vec![
+        ("User-Agent".to_string(), VIDEO_UA.replace("71332", TAB_VERSION)),
+        (
+            "Accept".to_string(),
+            "application/json; charset=utf-8,application/x-protobuf".to_string(),
+        ),
+        ("x-ss-req-ticket".to_string(), ticket.to_string()),
+        ("sdk-version".to_string(), "2".to_string()),
+        ("x-xs-from-web".to_string(), "0".to_string()),
+        ("passport-sdk-version".to_string(), "50561".to_string()),
+        ("x-ss-dp".to_string(), "8662".to_string()),
+        ("x-khronos".to_string(), khronos.to_string()),
+        ("x-gorgon".to_string(), x_gorgon(&query, None, khronos, random)),
+        ("x-ladon".to_string(), ladon(khronos)),
+        ("x-argus".to_string(), argus(khronos)),
+        ("x-helios".to_string(), helios(khronos, rng)),
+        (
+            "x-medusa".to_string(),
+            build_medusa(
+                &url,
+                None,
+                khronos,
+                &identity,
+                process_nonce,
+                process_started,
+                now_ms,
+                rng,
+            ),
+        ),
+        ("x-tt-dt".to_string(), String::new()),
+        ("x-tt-store-region".to_string(), "cn".to_string()),
+        ("x-tt-store-region-src".to_string(), "did".to_string()),
+        // A bodyless GET carries the request tag instead of the POST digest.
+        ("x-tt-request-tag".to_string(), "t=0;n=0".to_string()),
+    ];
+
+    SignedRequest {
+        url,
+        headers,
+        body: None,
+    }
+}
+
 /// `signedVideoRequest(payload)`.
 ///
 /// `now_ms` and `process_started` are the reference's `Date.now()` calls, and

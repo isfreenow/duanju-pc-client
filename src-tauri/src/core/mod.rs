@@ -29,6 +29,7 @@ pub mod tables;
 
 pub use device::{
     SearchCursor, SignedRequest, playback_request, signed_search_request, signed_video_request,
+    video_tab_request,
 };
 pub use rand::SignRng;
 pub use register::{RegisteredDevice, playback_device};
