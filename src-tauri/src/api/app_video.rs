@@ -16,9 +16,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::core;
+use crate::core::SignRng;
 use crate::core::spade::{base64_lenient, clean_url, decrypt_spade_url, derive_content_key};
 use crate::core::tables::VIDEO_UA;
-use crate::core::SignRng;
 
 use super::{API_DOMAINS, ApiError, ApiResult, Deadline, MEDIA_DOMAINS, now_millis, request_json};
 
@@ -210,10 +210,12 @@ pub async fn fetch_app_play_url(
         }
     }
 
-    let response = response.ok_or_else(|| last_error.unwrap_or_else(|| ApiError::Business {
-        message: "App 接口暂未提供本集播放信息".to_string(),
-        code: "BUSINESS_REJECTED".to_string(),
-    }))?;
+    let response = response.ok_or_else(|| {
+        last_error.unwrap_or_else(|| ApiError::Business {
+            message: "App 接口暂未提供本集播放信息".to_string(),
+            code: "BUSINESS_REJECTED".to_string(),
+        })
+    })?;
     if rejected(&response) {
         return Err(ApiError::Business {
             message: "App 接口暂未提供本集播放信息".to_string(),
@@ -260,9 +262,7 @@ pub async fn fetch_app_play_url(
             Err(error) => {
                 // Only an absent rendition recovers through the fallback; a hard
                 // codec or security failure is reported as-is.
-                if error.code() != "NO_PLAYABLE_SOURCE"
-                    || model.get("fallback_api").is_none()
-                {
+                if error.code() != "NO_PLAYABLE_SOURCE" || model.get("fallback_api").is_none() {
                     return Err(error);
                 }
             }

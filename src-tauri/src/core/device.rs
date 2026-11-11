@@ -133,8 +133,7 @@ pub fn video_tab_request(
     process_nonce: &str,
     process_started: i64,
 ) -> SignedRequest {
-    const VIDEO_TAB_API: &str =
-        "https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/";
+    const VIDEO_TAB_API: &str = "https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/";
     const TAB_VERSION: &str = "73932";
     const TAB_VERSION_NAME: &str = "7.3.9.32";
     let overrides: [(&'static str, &str); 5] = [
@@ -202,7 +201,10 @@ pub fn video_tab_request(
     // gorgon's 16-bit draw, then Helios, then Medusa's five draws.
     let random = rng.next_u16();
     let headers = vec![
-        ("User-Agent".to_string(), VIDEO_UA.replace("71332", TAB_VERSION)),
+        (
+            "User-Agent".to_string(),
+            VIDEO_UA.replace("71332", TAB_VERSION),
+        ),
         (
             "Accept".to_string(),
             "application/json; charset=utf-8,application/x-protobuf".to_string(),
@@ -213,7 +215,10 @@ pub fn video_tab_request(
         ("passport-sdk-version".to_string(), "50561".to_string()),
         ("x-ss-dp".to_string(), "8662".to_string()),
         ("x-khronos".to_string(), khronos.to_string()),
-        ("x-gorgon".to_string(), x_gorgon(&query, None, khronos, random)),
+        (
+            "x-gorgon".to_string(),
+            x_gorgon(&query, None, khronos, random),
+        ),
         ("x-ladon".to_string(), ladon(khronos)),
         ("x-argus".to_string(), argus(khronos)),
         ("x-helios".to_string(), helios(khronos, rng)),
